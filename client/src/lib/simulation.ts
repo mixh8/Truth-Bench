@@ -29,7 +29,7 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   grok_heavy_x: {
     id: 'grok_heavy_x',
     name: 'Grok 4 Heavy w/ X',
-    color: 'var(--color-model-grok-x)',
+    color: 'hsl(var(--color-model-grok-x))',
     avatar: '🌌',
     riskFactor: 0.9,
     description: 'X-integrated super-intelligence with real-time data access.'
@@ -37,7 +37,7 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   grok_heavy: {
     id: 'grok_heavy',
     name: 'Grok 4 Heavy',
-    color: 'var(--color-model-grok)',
+    color: 'hsl(var(--color-model-grok))',
     avatar: '🌑',
     riskFactor: 0.85,
     description: 'Heavyweight reasoning model.'
@@ -45,7 +45,7 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   gemini_pro: {
     id: 'gemini_pro',
     name: 'Gemini 3 Pro',
-    color: 'var(--color-model-gemini)',
+    color: 'hsl(var(--color-model-gemini))',
     avatar: '✨',
     riskFactor: 0.6,
     description: 'Multimodal expert with Google Search grounding.'
@@ -53,7 +53,7 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   claude_opus: {
     id: 'claude_opus',
     name: 'Claude Opus 4.5',
-    color: 'var(--color-model-claude)',
+    color: 'hsl(var(--color-model-claude))',
     avatar: '🧠',
     riskFactor: 0.4,
     description: 'High-safety, constitutional AI with long context.'
@@ -61,7 +61,7 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   gpt_5: {
     id: 'gpt_5',
     name: 'GPT-5.1',
-    color: 'var(--color-model-gpt)',
+    color: 'hsl(var(--color-model-gpt))',
     avatar: '🤖',
     riskFactor: 0.5,
     description: 'General purpose reasoning engine.'
@@ -69,7 +69,7 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   deepseek_v3: {
     id: 'deepseek_v3',
     name: 'DeepSeek-V3.2',
-    color: 'var(--color-model-deepseek)',
+    color: 'hsl(var(--color-model-deepseek))',
     avatar: '🐳',
     riskFactor: 0.7,
     description: 'Open weights champion, high efficiency.'
