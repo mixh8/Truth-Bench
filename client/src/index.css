@@ -75,7 +75,7 @@
   --radius: 0.5rem;
 
   /* Model Colors */
-  --model-grok-x: 190 100% 50%;   /* Bright Cyan for X version */
+  --model-grok-x: 0 0% 100%;      /* White for X version */
   --model-grok: 300 100% 60%;     /* Bright Magenta for Heavy */
   --model-claude: 24 95% 53%;     /* Orange */
   --model-gpt: 142 71% 45%;       /* Green */
