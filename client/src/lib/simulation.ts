@@ -183,7 +183,7 @@ export function useSimulation() {
           timestamp: now
         };
 
-        setEvents(prev => [newEvent, ...prev].slice(0, 50));
+        setEvents(prev => [newEvent, ...prev].slice(0, 20));
       }
 
     }, 1000); // Faster updates: 1 second
