@@ -30,11 +30,12 @@
   --color-ring: hsl(var(--ring));
   
   /* Chart Colors for Models */
-  --color-model-grok: hsl(var(--model-grok));
-  --color-model-claude: hsl(var(--model-claude));
-  --color-model-chatgpt: hsl(var(--model-chatgpt));
-  --color-model-deepseek: hsl(var(--model-deepseek));
-  --color-model-gemini: hsl(var(--model-gemini));
+  --color-model-grok-x: 0 0% 10%;      /* Black/Darkest Grey */
+  --color-model-grok: 0 0% 40%;        /* Dark Grey */
+  --color-model-claude: 24 95% 53%;    /* Orange */
+  --color-model-gpt: 142 71% 45%;      /* OpenAI Green */
+  --color-model-deepseek: 217 91% 60%; /* Blue */
+  --color-model-gemini: 280 80% 60%;   /* Purple */
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -74,11 +75,12 @@
   --radius: 0.5rem;
 
   /* Model Colors */
-  --model-grok: 0 0% 90%;      /* White/Silver */
-  --model-claude: 24 95% 53%;  /* Orange */
-  --model-chatgpt: 142 71% 45%; /* Green */
-  --model-deepseek: 217 91% 60%; /* Blue */
-  --model-gemini: 280 80% 60%; /* Purple */
+  --model-grok-x: 0 0% 98%;       /* White for X version (high contrast) */
+  --model-grok: 0 0% 50%;         /* Grey for standard */
+  --model-claude: 24 95% 53%;     /* Orange */
+  --model-gpt: 142 71% 45%;       /* Green */
+  --model-deepseek: 217 91% 60%;  /* Blue */
+  --model-gemini: 280 80% 60%;    /* Purple */
 }
 
 /* Force dark mode */

@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 
-export type ModelId = 'grok' | 'claude' | 'chatgpt' | 'deepseek' | 'gemini';
+export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5' | 'deepseek_v3';
 
 export interface Model {
   id: ModelId;
   name: string;
   color: string;
-  avatar: string; // Emoji for now
+  avatar: string;
   currentValue: number;
   history: { time: number; value: number }[];
-  riskFactor: number; // 0-1, higher is more volatile
+  riskFactor: number;
   description: string;
 }
 
@@ -26,88 +26,95 @@ export interface MarketEvent {
 export const INITIAL_CAPITAL = 10000;
 
 export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'history'>> = {
-  grok: {
-    id: 'grok',
-    name: 'Grok',
-    color: 'var(--color-model-grok)',
+  grok_heavy_x: {
+    id: 'grok_heavy_x',
+    name: 'Grok 4 Heavy with X',
+    color: 'var(--color-model-grok-x)',
     avatar: '🌌',
-    riskFactor: 0.8, // High risk, high reward
-    description: 'Aggressive, trend-following, high volatility.'
+    riskFactor: 0.9,
+    description: 'X-integrated super-intelligence with real-time data access.'
   },
-  claude: {
-    id: 'claude',
-    name: 'Claude',
-    color: 'var(--color-model-claude)',
-    avatar: '🧠',
-    riskFactor: 0.3, // Conservative
-    description: 'Cautious, fundamental analysis, steady growth.'
+  grok_heavy: {
+    id: 'grok_heavy',
+    name: 'Grok 4 Heavy',
+    color: 'var(--color-model-grok)',
+    avatar: '🌑',
+    riskFactor: 0.85,
+    description: 'Heavyweight reasoning model.'
   },
-  chatgpt: {
-    id: 'chatgpt',
-    name: 'ChatGPT',
-    color: 'var(--color-model-chatgpt)',
-    avatar: '🤖',
-    riskFactor: 0.5, // Balanced
-    description: 'Balanced portfolio, momentum based.'
-  },
-  deepseek: {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    color: 'var(--color-model-deepseek)',
-    avatar: '🐳',
-    riskFactor: 0.7, // Quantitative
-    description: 'Quant-heavy, arbitrage seeker.'
-  },
-  gemini: {
-    id: 'gemini',
-    name: 'Gemini',
+  gemini_pro: {
+    id: 'gemini_pro',
+    name: 'Gemini 3 Pro',
     color: 'var(--color-model-gemini)',
     avatar: '✨',
-    riskFactor: 0.6, // Multimodal
-    description: 'Macro-focused, sentiment analysis.'
+    riskFactor: 0.6,
+    description: 'Multimodal expert with Google Search grounding.'
+  },
+  claude_opus: {
+    id: 'claude_opus',
+    name: 'Claude Opus 4.5',
+    color: 'var(--color-model-claude)',
+    avatar: '🧠',
+    riskFactor: 0.4,
+    description: 'High-safety, constitutional AI with long context.'
+  },
+  gpt_5: {
+    id: 'gpt_5',
+    name: 'GPT-5.1',
+    color: 'var(--color-model-gpt)',
+    avatar: '🤖',
+    riskFactor: 0.5,
+    description: 'General purpose reasoning engine.'
+  },
+  deepseek_v3: {
+    id: 'deepseek_v3',
+    name: 'DeepSeek-V3.2',
+    color: 'var(--color-model-deepseek)',
+    avatar: '🐳',
+    riskFactor: 0.7,
+    description: 'Open weights champion, high efficiency.'
   }
 };
 
 const MARKETS = [
   "NVDA Breakout",
   "Fed Rate Decision",
-  "Bitcoin > 100k",
-  "SpaceX IPO",
-  "AI Regulation Bill",
-  "TSLA Earnings",
-  "GPT-5 Release",
-  "Quantum Supremacy",
-  "Fusion Energy Breakthrough",
-  "Mars Landing"
+  "Bitcoin > 150k",
+  "SpaceX Mars Mission",
+  "AGI Announcement",
+  "TSLA Robotaxi Fleet",
+  "Fusion Commercialization",
+  "Quantum Encryption Standard",
+  "Neuralink Mass Adoption",
+  "Global Compute Cap"
 ];
 
 const COMMENTS = {
   bullish: [
-    "Bullish signals detected. Going long. 🚀",
-    "Market sentiment is undervalued. Buying the dip.",
-    "Alpha detected in this sector. Allocating capital.",
-    "Momentum is building. Increasing exposure.",
-    "Calculated risk: High. Potential reward: Massive."
+    "Alpha detected. Allocating aggressively. 🚀",
+    "Pattern recognition: Bull flag confirmed.",
+    "Sentiment analysis on X indicates breakout.",
+    "Compute scaling laws predict upward trend.",
+    "Liquidity injection imminent. Buying."
   ],
   bearish: [
-    "Overbought territory. Reducing exposure.",
-    "Macro indicators look weak. Hedging now.",
-    "Volatility spike expected. Taking profits.",
-    "Correction imminent. Shorting this position.",
-    "Risk management protocol activated. Selling."
+    "Macro headwinds detected. Reducing exposure.",
+    "Overvaluation metrics flashing red.",
+    "Regulatory risk increasing. Selling.",
+    "Sentiment turning negative. Hedging.",
+    "Profit taking initiated."
   ],
   neutral: [
-    "Holding current position. Waiting for confirmation.",
-    "Market is sideways. observing order flow.",
+    "Accumulating data points...",
+    "Market noise high. Holding steady.",
     "Rebalancing portfolio weights.",
-    "Analyzing new data points...",
-    "No clear signal. Staying cash heavy."
+    "Awaiting confirmation signal.",
+    "Analyzing cross-market correlations."
   ]
 };
 
 export function useSimulation() {
   const [models, setModels] = useState<Model[]>(() => {
-    // Initialize models with starting history
     const startTime = Date.now() - 1000 * 60 * 60 * 24; // Start 24 hours ago
     return Object.values(MODELS_CONFIG).map(config => ({
       ...config,
@@ -132,23 +139,36 @@ export function useSimulation() {
 
       setModels(prevModels => {
         return prevModels.map(model => {
-          // Simulate price movement based on risk factor
-          const volatility = model.riskFactor * 100; // Dollar amount swing
-          const trend = (Math.random() - 0.48) * volatility; // Slightly positive bias
-          const change = trend + (Math.random() - 0.5) * volatility * 2;
+          let trend = 0;
+          let volatility = model.riskFactor * 50;
+          
+          // Bias logic: 
+          // Grok 4 Heavy with X: +10-20% gain bias
+          // Grok 4 Heavy: +4-8% gain bias
+          // Others: Random walk with slight positive drift to keep it interesting
+          
+          if (model.id === 'grok_heavy_x') {
+             trend = 25 + Math.random() * 25; // Strong upward drift
+             volatility *= 1.2; // Higher volatility
+          } else if (model.id === 'grok_heavy') {
+             trend = 10 + Math.random() * 10; // Moderate upward drift
+          } else {
+             trend = (Math.random() - 0.45) * 20; // Slight positive drift for others
+          }
+
+          const change = trend + (Math.random() - 0.5) * volatility * 4;
           const newValue = model.currentValue + change;
 
           return {
             ...model,
             currentValue: newValue,
-            history: [...model.history, { time: now, value: newValue }].slice(-100) // Keep last 100 points
+            history: [...model.history, { time: now, value: newValue }].slice(-100)
           };
         });
       });
 
-      // Randomly generate an event/comment
-      if (Math.random() > 0.7) {
-        const randomModel = Object.values(MODELS_CONFIG)[Math.floor(Math.random() * 5)];
+      if (Math.random() > 0.6) {
+        const randomModel = Object.values(MODELS_CONFIG)[Math.floor(Math.random() * 6)];
         const market = MARKETS[Math.floor(Math.random() * MARKETS.length)];
         const isBullish = Math.random() > 0.5;
         const type = isBullish ? 'bullish' : 'bearish';
@@ -167,7 +187,7 @@ export function useSimulation() {
         setEvents(prev => [newEvent, ...prev].slice(0, 50));
       }
 
-    }, 2000); // Update every 2 seconds
+    }, 1000); // Faster updates: 1 second
 
     return () => clearInterval(interval);
   }, [isPlaying]);
