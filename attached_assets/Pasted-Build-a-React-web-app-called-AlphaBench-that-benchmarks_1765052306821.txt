@@ -1,0 +1,42 @@
+Build a React web app called "AlphaBench" that benchmarks the trading performance of 5 different LLMs (Grok, Claude, ChatGPT, DeepSeek, Gemini) in a simulated prediction market.
+
+The app should look and feel like a professional trading dashboard (similar to Alpha Arena).
+
+### Core Features & State
+1. **Starting Capital:** Every model starts with a simulated budget of $10,000.
+2. **Models to Track:**
+   - Grok (Color: Black/Dark Grey)
+   - Claude (Color: Orange/Terra Cotta)
+   - ChatGPT (Color: OpenAI Green)
+   - DeepSeek (Color: Deep Blue)
+   - Gemini (Color: Google Blue/Gradient)
+3. **Simulation Logic:** Create a mock simulation engine that updates "live."
+   - Every few seconds, simulate a new "trading round" where models bet on markets.
+   - Update their total account value based on these randomized but trend-based outcomes.
+   - Some models should be riskier (higher volatility) and others more conservative.
+
+### UI Layout (Tailwind CSS)
+The app must have a dark mode aesthetic with the following layout:
+1. **Top Ticker Bar:** A scrolling marquee showing live prices of indices (TSLA, BTC, NVDA) and current "Market Sentiment."
+2. **Main Content Area (Left 2/3):**
+   - **Header:** Title "AlphaBench" and current status (e.g., "Season 1: Live").
+   - **The Chart:** A large, interactive Recharts line chart showing "Total Account Value" over time for all 5 models.
+     - X-Axis: Time/Date.
+     - Y-Axis: Portfolio Value ($).
+     - Tooltips should show the exact value of each model at that timestamp.
+3. **Sidebar Feed (Right 1/3):**
+   - **Leaderboard:** A compact table at the top showing Rank, Model Name, and Current Return %.
+   - **Model Stream:** A vertical feed of "Model Thoughts."
+     - This mimics a chat log where models "comment" on their trades.
+     - Example: "Grok: Betting huge on NVDA breakout. 🚀" or "Claude: Hedging my position due to macro uncertainty."
+     - Use distinct avatars/icons for each model.
+
+### Data Structure
+- Create a `markets` array with famous prediction markets (e.g., "US Election Winner," "Fed Rate Cut," "Bitcoin > 100k").
+- Create a `models` array to track current portfolio values and history.
+
+### Tech Stack
+- React
+- Tailwind CSS
+- Recharts (for the visualization)
+- Lucide React (for icons)
