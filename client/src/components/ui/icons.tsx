@@ -8,28 +8,31 @@ export const OpenAIIcon = ({ className }: { className?: string }) => (
 
 export const ClaudeIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-    {/* Placeholder for complex Claude icon - using a simple info-like shape as fallback if exact path is too long/complex */}
-    <path d="M3.5 11.5L6.5 10l.5-.5H8l-.5 2L5 12l-1.5.5-2-.5.5-2 .5.5 1.5 1L5 13l2 1.5.5.5.5-.5-1-2.5-1.5-1.5-.5-.5-.5.5-.5 1 .5-.5.5.5.5 1.5 2 1.5.5.5-.5-.5-1-2.5-.5-.5.5-.5.5.5.5 1 .5.5 1.5 2L10 12l.5-.5.5-.5-.5-1-.5-.5-.5.5-.5.5-.5 1 .5.5 1.5 2 1.5.5.5.5-.5-1-2.5-.5-.5.5-.5.5.5.5 1 .5.5 1.5 2L14 12l.5-.5.5-.5-.5-1-.5-.5-.5.5-.5.5-.5 1 .5.5 1.5 2 1.5.5.5.5-.5-1-2.5-.5-.5.5-.5.5.5.5 1 .5.5 1.5 2L18 12l.5-.5.5-.5-.5-1-.5-.5-.5.5-.5.5-.5 1 .5.5 1.5 2 1.5.5.5.5-.5-1-2.5-.5-.5.5-.5.5.5.5 1 .5.5 1.5 2L22 12l.5-.5.5-.5-.5-1-.5-.5-.5.5-.5.5-.5 1 .5.5 1.5 2 1.5.5.5.5-.5-1-2.5-.5-.5.5-.5.5.5.5 1 .5.5 1.5 2z"/>
+    {/* Asterisk/Spark shape for Claude */}
+    <path d="M11 1L11 9L5 4L4 5L9 11L1 11L1 13L9 13L4 19L5 20L11 15L11 23L13 23L13 15L19 20L20 19L15 13L23 13L23 11L15 11L20 5L19 4L13 9L13 1L11 1Z" />
   </svg>
 );
 
 export const GrokIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-    <path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 14h-4v-4h4v4zm0-6h-4V6h4v4zm-6 6H8v-4h4v4zm0-6H8V6h4v4z"/>
-    {/* Stylized square pattern resembling the Grok logo blockiness */}
+    {/* Stylized slash/G shape for Grok */}
+    <path d="M20.5 3.5L3.5 20.5" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
   </svg>
 );
 
 export const GeminiIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-     <path d="M11.9,2.5c0,4.8,3.9,8.8,8.7,8.8c-4.8,0-8.7,3.9-8.7,8.8c0-4.8-3.9-8.8-8.7-8.8C8,11.3,11.9,7.4,11.9,2.5z"/>
-     <path d="M19.3,14.6c0,1.8,1.5,3.3,3.3,3.3c-1.8,0-3.3,1.5-3.3,3.3c0-1.8-1.5-3.3-3.3-3.3C17.9,17.9,19.3,16.4,19.3,14.6z"/>
+     {/* 4-pointed star shape for Gemini */}
+     <path d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z" />
   </svg>
 );
 
 export const DeepSeekIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-    <path d="M22 12c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2s10 4.48 10 10zm-2 0c0-4.42-3.58-8-8-8s-8 3.58-8 8 3.58 8 8 8 8-3.58 8-8zm-5 0c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z"/>
+    {/* Whale shape for DeepSeek */}
+    <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" opacity="0.2"/>
+    <path d="M18 8C18 8 16 9 16 11C16 13 18 14 18 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M12 16C12 16 9 16 7 14C5 12 5 9 5 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
