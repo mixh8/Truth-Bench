@@ -104,7 +104,7 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
             {models.map(model => (
                 <div key={model.id} className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: MODELS_CONFIG[model.id].color }} />
-                    <span className="text-muted-foreground hidden md:inline font-medium">{model.name}</span>
+                    <span className="hidden md:inline font-medium" style={{ color: MODELS_CONFIG[model.id].color }}>{model.name}</span>
                 </div>
             ))}
         </div>
