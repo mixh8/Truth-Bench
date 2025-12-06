@@ -3,6 +3,19 @@ import { cn } from "@/lib/utils";
 import { MessageSquare, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
+import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
+
+const ModelIcon = ({ id, className }: { id: string, className?: string }) => {
+  switch (id) {
+    case 'grok_heavy_x': return <GrokIcon className={className} />;
+    case 'grok_heavy': return <GrokIcon className={className} />;
+    case 'gemini_pro': return <GeminiIcon className={className} />;
+    case 'claude_opus': return <ClaudeIcon className={className} />;
+    case 'gpt_5': return <OpenAIIcon className={className} />;
+    case 'deepseek_v3': return <DeepSeekIcon className={className} />;
+    default: return null;
+  }
+};
 
 interface ModelStreamProps {
   events: MarketEvent[];
@@ -36,7 +49,7 @@ export function ModelStream({ events }: ModelStreamProps) {
                   className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-border/50 bg-background"
                   style={{ color: modelConfig.color }}
                 >
-                  {modelConfig.avatar}
+                  <ModelIcon id={event.modelId} className="w-4 h-4" />
                 </div>
                 
                 <div className="flex-1 space-y-1">
