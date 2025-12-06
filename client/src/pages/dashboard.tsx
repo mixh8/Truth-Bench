@@ -24,7 +24,7 @@ export default function Dashboard() {
                         LIVE
                     </Badge>
                 </div>
-                <p className="text-muted-foreground">Season 1: Large Language Model Trading Simulation</p>
+                <p className="text-muted-foreground">Prediction Market Simulator</p>
             </div>
             
             <div className="flex items-center gap-2">
