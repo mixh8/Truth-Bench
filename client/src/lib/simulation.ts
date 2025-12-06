@@ -143,20 +143,19 @@ export function useSimulation() {
           let volatility = model.riskFactor * 50;
           
           // Bias logic: 
-          // Grok 4 Heavy with X: +10-20% gain bias
-          // Grok 4 Heavy: +4-8% gain bias
-          // Others: Random walk with slight positive drift to keep it interesting
+          // Grok 4 Heavy with X: Win by 2-7%
+          // Grok 4 Heavy: 2nd place
           
           if (model.id === 'grok_heavy_x') {
-             trend = 25 + Math.random() * 25; // Strong upward drift
-             volatility *= 1.2; // Higher volatility
+             trend = 4 + Math.random() * 4; // Controlled upward drift
+             volatility *= 1.1; 
           } else if (model.id === 'grok_heavy') {
-             trend = 10 + Math.random() * 10; // Moderate upward drift
+             trend = 2 + Math.random() * 3; // Slightly less drift
           } else {
-             trend = (Math.random() - 0.45) * 20; // Slight positive drift for others
+             trend = (Math.random() - 0.48) * 8; // Flat/Slightly positive for others
           }
 
-          const change = trend + (Math.random() - 0.5) * volatility * 4;
+          const change = trend + (Math.random() - 0.5) * volatility * 3;
           const newValue = model.currentValue + change;
 
           return {
