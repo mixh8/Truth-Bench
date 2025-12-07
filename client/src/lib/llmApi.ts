@@ -5,7 +5,9 @@
  * the Python llm-service backend.
  */
 
-const LLM_SERVICE_URL = 'http://localhost:8000';
+// Allow overriding the backend during dev (defaults to local Python service)
+const LLM_SERVICE_URL =
+  import.meta.env.VITE_LLM_SERVICE_URL ?? 'http://localhost:8000';
 
 // ============================================================================
 // Types matching Python schemas (llm_service/llm/schemas.py)

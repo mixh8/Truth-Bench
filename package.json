@@ -5,7 +5,10 @@
   "license": "MIT",
   "scripts": {
     "dev:client": "vite dev --port 5000",
+    "dev:client:render": "VITE_LLM_SERVICE_URL=https://truth-bench.onrender.com pnpm dev:client",
     "dev": "NODE_ENV=development tsx server/index.ts",
+    "preview:client": "vite preview --port 5000",
+    "preview:client:render": "VITE_LLM_SERVICE_URL=https://truth-bench.onrender.com pnpm preview:client",
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
