@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Dashboard from "@/pages/dashboard";
 import Report from "@/pages/report";
 import Analyze from "@/pages/analyze";
+import Chat from "@/pages/chat";
 import NotFound from "@/pages/not-found";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/report" component={Report} />
       <Route path="/analyze" component={Analyze} />
+      <Route path="/chat" component={Chat} />
       <Route component={NotFound} />
     </Switch>
   );

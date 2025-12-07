@@ -1,0 +1,27 @@
+[project]
+name = "llm-service"
+version = "0.1.0"
+description = "Multi-provider LLM service using LiteLLM with FastAPI"
+readme = "README.md"
+authors = [
+    { name = "renesultan", email = "rene.sultan4@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.124.0",
+    "litellm>=1.80.8",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.2.1",
+    "uvicorn[standard]>=0.38.0",
+]
+
+[project.scripts]
+llm-service = "llm_service.main:main"
+
+[build-system]
+requires = ["uv_build>=0.8.13,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
