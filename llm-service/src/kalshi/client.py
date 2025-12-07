@@ -11,6 +11,39 @@ PROD_API_URL = "https://api.elections.kalshi.com/trade-api/v2"
 DEMO_API_URL = "https://demo-api.kalshi.co/trade-api/v2"
 
 
+def scrape_kalshi_feed():
+    """
+    Scrapes the Kalshi homepage feed and returns the JSON data.
+    
+    Returns:
+        dict: The feed data from Kalshi API
+    """
+    url = 'https://api.elections.kalshi.com/v1/users/feed'
+    
+    headers = {
+        'accept': 'application/json',
+        'accept-language': 'en-US,en;q=0.9',
+        'cache-control': 'no-cache',
+        'dnt': '1',
+        'origin': 'https://kalshi.com',
+        'pragma': 'no-cache',
+        'priority': 'u=1, i',
+        'referer': 'https://kalshi.com/',
+        'sec-ch-ua': '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-site',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+    }
+    
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()  # Raise an error for bad status codes
+    
+    return response.json()
+
+
 class KalshiClient:
     """Client for interacting with the Kalshi API."""
 

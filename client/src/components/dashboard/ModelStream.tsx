@@ -12,7 +12,6 @@ const ModelIcon = ({ id, className }: { id: string, className?: string }) => {
     case 'gemini_pro': return <GeminiIcon className={className} />;
     case 'claude_opus': return <ClaudeIcon className={className} />;
     case 'gpt_5': return <OpenAIIcon className={className} />;
-    case 'deepseek_v3': return <DeepSeekIcon className={className} />;
     default: return null;
   }
 };

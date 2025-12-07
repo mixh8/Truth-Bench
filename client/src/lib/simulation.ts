@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5' | 'deepseek_v3';
+export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5';
 
 export interface Model {
   id: ModelId;
@@ -40,11 +40,11 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
   },
   grok_heavy: {
     id: 'grok_heavy',
-    name: 'Grok 4 Heavy',
+    name: 'Grok 4.1 Fast (Reasoning)',
     color: 'hsl(var(--color-model-grok))',
     avatar: '🌑',
     riskFactor: 0.85,
-    description: 'Heavyweight reasoning model.'
+    description: 'Fast reasoning model with advanced inference capabilities.'
   },
   gemini_pro: {
     id: 'gemini_pro',
@@ -69,14 +69,6 @@ export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'histor
     avatar: '🤖',
     riskFactor: 0.5,
     description: 'General purpose reasoning engine.'
-  },
-  deepseek_v3: {
-    id: 'deepseek_v3',
-    name: 'DeepSeek-V3.2',
-    color: 'hsl(var(--color-model-deepseek))',
-    avatar: '🐳',
-    riskFactor: 0.7,
-    description: 'Open weights champion, high efficiency.'
   }
 };
 

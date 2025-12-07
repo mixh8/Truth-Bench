@@ -20,7 +20,6 @@ const ModelIcon = ({ id, className }: { id: string, className?: string }) => {
     case 'gemini_pro': return <GeminiIcon className={className} />;
     case 'claude_opus': return <ClaudeIcon className={className} />;
     case 'gpt_5': return <OpenAIIcon className={className} />;
-    case 'deepseek_v3': return <DeepSeekIcon className={className} />;
     default: return null;
   }
 };
@@ -78,15 +77,18 @@ const CustomizedDot = (props: any) => {
 };
 
 export function PerformanceChart({ models }: PerformanceChartProps) {
-  if (!models.length || !models[0].history.length) return null;
+  // Filter out models that don't exist in MODELS_CONFIG (e.g., removed models still in DB)
+  const validModels = models.filter(model => MODELS_CONFIG[model.id as ModelId]);
+  
+  if (!validModels.length || !validModels[0].history.length) return null;
 
-  const chartData = models[0].history.map((point, index) => {
+  const chartData = validModels[0].history.map((point, index) => {
     const dataPoint: any = {
       time: point.time,
       formattedTime: format(point.time, 'HH:mm'),
     };
     
-    models.forEach(model => {
+    validModels.forEach(model => {
       dataPoint[model.id] = model.history[index]?.value || model.currentValue;
     });
     
@@ -101,7 +103,7 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
             <p className="text-sm text-muted-foreground">Benchmarking simulated trading performance</p>
         </div>
         <div className="flex flex-wrap items-center gap-4 text-xs">
-            {models.map(model => (
+            {validModels.map(model => (
                 <div key={model.id} className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: MODELS_CONFIG[model.id].color }} />
                     <span className="hidden md:inline font-medium" style={{ color: MODELS_CONFIG[model.id].color }}>{model.name}</span>
@@ -141,7 +143,7 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
                 opacity: 0.5
               }}
             />
-            {models.map(model => (
+            {validModels.map(model => (
                 <Line
                     key={model.id}
                     type="monotone"
@@ -149,13 +151,17 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
                     name={model.name}
                     stroke={MODELS_CONFIG[model.id].color}
                     strokeWidth={2}
-                    dot={(props: any) => (
-                      <CustomizedDot 
-                        {...props} 
-                        dataLength={chartData.length} 
-                        modelId={model.id} 
-                      />
-                    )}
+                    dot={(props: any) => {
+                      const { key, ...dotProps } = props;
+                      return (
+                        <CustomizedDot 
+                          key={key}
+                          {...dotProps} 
+                          dataLength={chartData.length} 
+                          modelId={model.id} 
+                        />
+                      );
+                    }}
                     activeDot={{ r: 4, strokeWidth: 0 }}
                     animationDuration={500}
                     isAnimationActive={false}

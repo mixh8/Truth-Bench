@@ -16,7 +16,6 @@ const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
     case 'gemini_pro': return <GeminiIcon className={className} />;
     case 'claude_opus': return <ClaudeIcon className={className} />;
     case 'gpt_5': return <OpenAIIcon className={className} />;
-    case 'deepseek_v3': return <DeepSeekIcon className={className} />;
     default: return null;
   }
 };
@@ -50,7 +49,6 @@ const STATIC_METRICS: Record<string, { winRate: number; sharpeRatio: number; max
   gpt_5: { winRate: 41.0, sharpeRatio: 1.95, maxDrawdown: -16.80 },
   claude_opus: { winRate: 38.0, sharpeRatio: 2.40, maxDrawdown: -9.50 },
   gemini_pro: { winRate: 35.0, sharpeRatio: 1.45, maxDrawdown: -22.30 },
-  deepseek_v3: { winRate: 29.0, sharpeRatio: 0.85, maxDrawdown: -31.40 },
 };
 
 function getTruthScoreLabel(score: number): { label: string; className: string } {

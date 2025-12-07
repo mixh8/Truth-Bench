@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
+    x_api_key: str = Field(default="", alias="X_API_KEY", description="X/Twitter API Bearer Token")
 
     # CORS configuration
     cors_origins: list[str] = Field(

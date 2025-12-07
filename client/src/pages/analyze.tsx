@@ -16,7 +16,15 @@ import {
 } from "lucide-react";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getKalshiFeed, analyzeMarket, type TwitterMetrics, type ModelPrediction } from "@/lib/llmApi";
+
+interface MarketOutcome {
+  label: string;
+  ticker: string;
+  price: number;
+}
 
 interface Market {
   id: string;
@@ -27,6 +35,9 @@ interface Market {
   yesPrice: number;
   noPrice: number;
   volume: string;
+  url?: string;
+  eventTicker?: string;
+  allOutcomes?: MarketOutcome[];  // All possible outcomes for multivariate markets
 }
 
 interface ModelVote {
@@ -115,7 +126,7 @@ const MARKETS: Market[] = [
 const MODEL_VOTES: Record<string, ModelVote[]> = {
   'pres-winner-28': [
     { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 82, reasoning: 'Strong early momentum and party consolidation signals' },
-    { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 78, reasoning: 'Historical pattern matching favors incumbent party fatigue' },
+    { id: 'grok_heavy', name: 'Grok 4.1 Fast (Reasoning)', vote: 'YES', confidence: 78, reasoning: 'Historical pattern matching favors incumbent party fatigue' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 71, reasoning: 'Economic indicators suggest favorable conditions for challenger' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 68, reasoning: 'Sentiment analysis shows growing support trajectory' },
     { id: 'claude_opus', name: 'Claude Opus 4.5', vote: 'NO', confidence: 65, reasoning: 'Advises caution due to high uncertainty this far out' },
@@ -123,7 +134,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
   ],
   'fed-nominee': [
     { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 88, reasoning: 'X posts strongly indicate Hassett as frontrunner' },
-    { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 85, reasoning: 'Political alignment analysis supports this pick' },
+    { id: 'grok_heavy', name: 'Grok 4.1 Fast (Reasoning)', vote: 'YES', confidence: 85, reasoning: 'Political alignment analysis supports this pick' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 79, reasoning: 'Historical nomination patterns match this profile' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 76, reasoning: 'Media coverage analysis suggests strong candidacy' },
     { id: 'claude_opus', name: 'Claude Opus 4.5', vote: 'YES', confidence: 72, reasoning: 'Policy alignment with administration priorities is high' },
@@ -131,7 +142,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
   ],
   'dem-nom-28': [
     { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 65, reasoning: 'Social media momentum building for Newsom' },
-    { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'NO', confidence: 58, reasoning: 'Field is too crowded for certainty' },
+    { id: 'grok_heavy', name: 'Grok 4.1 Fast (Reasoning)', vote: 'NO', confidence: 58, reasoning: 'Field is too crowded for certainty' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 62, reasoning: 'Fundraising capacity gives significant advantage' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'NO', confidence: 55, reasoning: 'Primary dynamics historically unpredictable' },
     { id: 'claude_opus', name: 'Claude Opus 4.5', vote: 'NO', confidence: 60, reasoning: 'Too early to determine with high confidence' },
@@ -139,7 +150,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
   ],
   'cabinet-exit': [
     { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 72, reasoning: 'Media scrutiny patterns suggest vulnerability' },
-    { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 68, reasoning: 'Historical cabinet turnover analysis supports this' },
+    { id: 'grok_heavy', name: 'Grok 4.1 Fast (Reasoning)', vote: 'YES', confidence: 68, reasoning: 'Historical cabinet turnover analysis supports this' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'NO', confidence: 55, reasoning: 'Multiple candidates have similar risk profiles' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 64, reasoning: 'Controversy timeline suggests early departure' },
     { id: 'claude_opus', name: 'Claude Opus 4.5', vote: 'NO', confidence: 58, reasoning: 'Insufficient data for confident prediction' },
@@ -147,7 +158,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
   ],
   'house-2026': [
     { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 81, reasoning: 'Midterm historical patterns favor opposition party' },
-    { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 78, reasoning: 'Redistricting analysis favors Democrats' },
+    { id: 'grok_heavy', name: 'Grok 4.1 Fast (Reasoning)', vote: 'YES', confidence: 78, reasoning: 'Redistricting analysis favors Democrats' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 75, reasoning: 'Economic cycle positioning supports flip' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 72, reasoning: 'Polling trajectory analysis is favorable' },
     { id: 'claude_opus', name: 'Claude Opus 4.5', vote: 'YES', confidence: 69, reasoning: 'Structural advantages in key districts' },
@@ -155,7 +166,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
   ],
   'world-leader-exit': [
     { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'NO', confidence: 75, reasoning: 'Authoritarian regimes show remarkable stability' },
-    { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'NO', confidence: 72, reasoning: 'Opposition lacks coordination for ouster' },
+    { id: 'grok_heavy', name: 'Grok 4.1 Fast (Reasoning)', vote: 'NO', confidence: 72, reasoning: 'Opposition lacks coordination for ouster' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'NO', confidence: 68, reasoning: 'Historical analysis of similar regimes' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 45, reasoning: 'Some external pressure indicators rising' },
     { id: 'claude_opus', name: 'Claude Opus 4.5', vote: 'NO', confidence: 70, reasoning: 'Structural factors support continuation' },
@@ -206,13 +217,20 @@ const X_TWEETS: Record<string, XTweet[]> = {
 };
 
 const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
+  // Handle both backend and frontend model IDs
   switch (id) {
+    // Backend IDs (used in analyze page)
+    case 'grok-beta': return <GrokIcon className={className} />;
+    case 'grok-beta-x': return <GrokIcon className={className} />;
+    case 'gpt-5.1': return <OpenAIIcon className={className} />;
+    case 'anthropic/claude-opus-4-5-20251101': return <ClaudeIcon className={className} />;
+    case 'gemini/gemini-3-pro': return <GeminiIcon className={className} />;
+    // Frontend IDs (used in dashboard)
     case 'grok_heavy_x': return <GrokIcon className={className} />;
     case 'grok_heavy': return <GrokIcon className={className} />;
     case 'gemini_pro': return <GeminiIcon className={className} />;
     case 'claude_opus': return <ClaudeIcon className={className} />;
     case 'gpt_5': return <OpenAIIcon className={className} />;
-    case 'deepseek_v3': return <DeepSeekIcon className={className} />;
     default: return null;
   }
 };
@@ -264,7 +282,7 @@ function MarketCard({ market, isSelected, onClick }: { market: Market; isSelecte
   );
 }
 
-function ConsensusPanel({ market, votes, tweets }: { market: Market; votes: ModelVote[]; tweets: XTweet[] }) {
+function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: { market: Market; votes: ModelVote[]; tweets: XTweet[]; twitterMetrics?: TwitterMetrics | null; isAnalyzing?: boolean }) {
   const [contracts, setContracts] = useState(10);
   
   const analysis = useMemo(() => {
@@ -313,26 +331,47 @@ function ConsensusPanel({ market, votes, tweets }: { market: Market; votes: Mode
             <Badge variant="outline" className="text-xs bg-slate-800 border-slate-700 text-slate-400">
               {market.tag}
             </Badge>
-            <a href="#" className="text-slate-500 hover:text-slate-300">
-              <ExternalLink className="w-4 h-4" />
-            </a>
+            {market.url && (
+              <a 
+                href={market.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-slate-500 hover:text-slate-300 transition-colors"
+                title="View on Kalshi"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-slate-100 mb-2">{market.title}</h2>
           <p className="text-sm text-slate-400">{MARKET_DEFINITIONS[market.id]}</p>
         </div>
 
         <div className={cn(
-          "rounded-xl p-6 border-2",
+          "rounded-xl p-6 border-2 relative",
           analysis.recommendation === 'YES' 
             ? "bg-gradient-to-br from-emerald-950/50 to-slate-900 border-emerald-500/40" 
             : "bg-gradient-to-br from-rose-950/50 to-slate-900 border-rose-500/40"
         )}>
+          {isAnalyzing && (
+            <div className="absolute inset-0 bg-slate-900/80 rounded-xl flex items-center justify-center z-10">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-2"></div>
+                <div className="text-sm text-slate-400">Analyzing with LLMs...</div>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-1">
             <Activity className={cn(
               "w-5 h-5",
               analysis.recommendation === 'YES' ? "text-emerald-400" : "text-rose-400"
             )} />
             <span className="text-sm font-semibold text-slate-300">TruthBench Consensus</span>
+            {!isAnalyzing && votes.length > 0 && (
+              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 ml-auto">
+                LIVE AI ANALYSIS
+              </Badge>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -410,9 +449,136 @@ function ConsensusPanel({ market, votes, tweets }: { market: Market; votes: Mode
             <Badge variant="outline" className="text-[10px] bg-slate-800 border-slate-700 text-slate-500">
               @X
             </Badge>
+            {twitterMetrics && (
+              <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/30">
+                {twitterMetrics.total_tweets || 0} tweets • {twitterMetrics.tweets_last_24h || 0} last 24h
+              </Badge>
+            )}
           </div>
+          
+          {/* Twitter Metrics Dashboard */}
+          {twitterMetrics && (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {/* Volume Metrics */}
+              <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                <div className="text-xs text-slate-500 mb-1">Tweet Volume</div>
+                <div className="text-lg font-bold text-slate-200">{(twitterMetrics.total_tweets || 0).toLocaleString()}</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {twitterMetrics.tweets_last_hour || 0} in last hour
+                </div>
+              </div>
+              
+              {/* Velocity */}
+              <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                <div className="text-xs text-slate-500 mb-1">Velocity (24h)</div>
+                <div className="text-lg font-bold text-slate-200">{(twitterMetrics.tweet_velocity_24h || 0).toFixed(1)}/hr</div>
+                <div className={cn(
+                  "text-xs mt-1 flex items-center gap-1",
+                  (twitterMetrics.velocity_change || 0) > 0 ? "text-emerald-400" : "text-rose-400"
+                )}>
+                  {(twitterMetrics.velocity_change || 0) > 0 ? "↗" : "↘"} {Math.abs(twitterMetrics.velocity_change || 0).toFixed(1)}x vs 7d avg
+                </div>
+              </div>
+              
+              {/* Engagement */}
+              <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                <div className="text-xs text-slate-500 mb-1">Engagement Rate</div>
+                <div className="text-lg font-bold text-slate-200">{((twitterMetrics.avg_engagement_rate || 0) * 100).toFixed(2)}%</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {(twitterMetrics.total_likes || 0).toLocaleString()} likes • {(twitterMetrics.total_retweets || 0).toLocaleString()} RTs
+                </div>
+              </div>
+              
+              {/* Audience Quality */}
+              <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                <div className="text-xs text-slate-500 mb-1">Audience Quality</div>
+                <div className="text-lg font-bold text-slate-200">{twitterMetrics.verified_user_tweets || 0}</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  verified • {(twitterMetrics.unique_authors || 0).toLocaleString()} unique authors
+                </div>
+              </div>
+              
+              {/* Top Hashtags */}
+              {twitterMetrics.top_hashtags && twitterMetrics.top_hashtags.length > 0 && (
+                <div className="col-span-2 p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                  <div className="text-xs text-slate-500 mb-2">Trending Hashtags</div>
+                  <div className="flex flex-wrap gap-1">
+                    {twitterMetrics.top_hashtags.slice(0, 5).map((tag) => (
+                      <Badge key={tag.tag} variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/30">
+                        #{tag.tag} ({tag.count})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* News Mentions */}
+              {twitterMetrics.news_domain_mentions && Object.keys(twitterMetrics.news_domain_mentions).length > 0 && (
+                <div className="col-span-2 p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                  <div className="text-xs text-slate-500 mb-2">News Sources Mentioned</div>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(twitterMetrics.news_domain_mentions).slice(0, 5).map(([domain, count]) => (
+                      <Badge key={domain} variant="outline" className="text-[10px] bg-slate-700 text-slate-300 border-slate-600">
+                        {domain} ({count})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Top Tweets */}
+          {twitterMetrics && twitterMetrics.top_tweets && twitterMetrics.top_tweets.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Top Tweets</div>
+            </div>
+          )}
+          
           <div className="space-y-3">
-            {tweets.map(tweet => (
+            {twitterMetrics && twitterMetrics.top_tweets && twitterMetrics.top_tweets.length > 0 ? (
+              // Use real Twitter data
+              twitterMetrics.top_tweets.slice(0, 3).map(tweet => (
+                <div 
+                  key={tweet.id}
+                  className={cn(
+                    "p-4 rounded-lg bg-slate-900/80 border border-blue-500/30"
+                  )}
+                  data-testid={`tweet-card-${tweet.id}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-2xl">{tweet.author_verified ? '✓' : '👤'}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-sm text-slate-200">@{tweet.author_username}</span>
+                        {tweet.author_verified && (
+                          <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/30">
+                            Verified
+                          </Badge>
+                        )}
+                        <span className="text-xs text-slate-500">{tweet.author_followers.toLocaleString()} followers</span>
+                      </div>
+                      <p className="text-sm text-slate-300 leading-relaxed mb-2">{tweet.text}</p>
+                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                        <span>❤️ {tweet.engagement.likes.toLocaleString()}</span>
+                        <span>🔁 {tweet.engagement.retweets.toLocaleString()}</span>
+                        <span>💬 {tweet.engagement.replies.toLocaleString()}</span>
+                        <a 
+                          href={tweet.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="ml-auto text-blue-400 hover:text-blue-300"
+                        >
+                          View →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : tweets && tweets.length > 0 ? (
+              // Fallback to hardcoded tweets if no Twitter data
+              tweets.map(tweet => (
               <div 
                 key={tweet.id}
                 className={cn(
@@ -451,7 +617,12 @@ function ConsensusPanel({ market, votes, tweets }: { market: Market; votes: Mode
                   </div>
                 </div>
               </div>
-            ))}
+            ))
+            ) : (
+              <div className="text-center text-slate-400 py-8">
+                No tweets available
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -493,10 +664,130 @@ function ConsensusPanel({ market, votes, tweets }: { market: Market; votes: Mode
 }
 
 export default function Analyze() {
+  const [markets, setMarkets] = useState<Market[]>(MARKETS);
+  const [loading, setLoading] = useState(true);
   const [selectedMarketId, setSelectedMarketId] = useState<string>('pres-winner-28');
+  const [twitterData, setTwitterData] = useState<Record<string, TwitterMetrics>>({});
+  const [seriesTickerMap, setSeriesTickerMap] = useState<Record<string, string>>({});
+
+  // Fetch Kalshi feed data on component mount
+  useEffect(() => {
+    async function fetchKalshiData() {
+      try {
+        setLoading(true);
+        const feedData = await getKalshiFeed(10);
+        
+        // Extract events from the response
+        const events = feedData.kalshi_feed?.feed || feedData.feed || [];
+        const twitterAug = feedData.twitter_augmentation || {};
+        
+        // Build Twitter data map by series_ticker
+        const twitterMap: Record<string, TwitterMetrics> = {};
+        const tickerMap: Record<string, string> = {};
+        
+        Object.entries(twitterAug).forEach(([seriesTicker, data]: [string, any]) => {
+          twitterMap[seriesTicker] = data.twitter_metrics;
+        });
+        
+        if (Array.isArray(events)) {
+          const transformedMarkets: Market[] = events
+            .filter(event => event.markets && event.markets.length > 0)
+            .map((event, index) => {
+              const market = event.markets![0]; // Use first market for display
+              const ticker = market.ticker || event.event_ticker || `MARKET-${index}`;
+              const seriesTicker = event.series_ticker || event.event_ticker || '';
+              
+              // Map market ID to series ticker for Twitter data lookup
+              tickerMap[ticker.toLowerCase()] = seriesTicker;
+              
+              const eventTicker = event.event_ticker || event.series_ticker || '';
+              
+              // Extract ALL outcomes for multivariate markets
+              const allOutcomes: MarketOutcome[] = event.markets!.map((m: any) => ({
+                label: m.yes_subtitle || 'Unknown',
+                ticker: m.ticker || '',
+                price: m.last_price || 50,
+              }));
+              
+              return {
+                id: ticker.toLowerCase(),
+                tag: event.category || 'General',
+                ticker: ticker,
+                title: event.event_title || 'Untitled Market',
+                yesLabel: market.yes_subtitle || 'YES',
+                yesPrice: market.last_price || 50,
+                noPrice: 100 - (market.last_price || 50),
+                volume: event.total_volume 
+                  ? `$${(event.total_volume / 1000000).toFixed(1)}M` 
+                  : '$0M',
+                url: eventTicker ? `https://kalshi.com/events/${eventTicker}` : undefined,
+                eventTicker: eventTicker,
+                allOutcomes: allOutcomes,  // Store all outcomes
+              };
+            });
+          
+          if (transformedMarkets.length > 0) {
+            setMarkets(transformedMarkets);
+            setTwitterData(twitterMap);
+            setSeriesTickerMap(tickerMap);
+            setSelectedMarketId(transformedMarkets[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch Kalshi data:', error);
+        // Keep using hardcoded MARKETS as fallback
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchKalshiData();
+  }, []);
   
-  const selectedMarket = MARKETS.find(m => m.id === selectedMarketId)!;
-  const selectedVotes = MODEL_VOTES[selectedMarketId] || [];
+  const selectedMarket = markets.find(m => m.id === selectedMarketId)!;
+  
+  // Get Twitter data for selected market
+  const seriesTicker = seriesTickerMap[selectedMarketId];
+  const selectedTwitter = seriesTicker ? twitterData[seriesTicker] : null;
+  
+  // Fetch LLM predictions for selected market
+  const { data: analysisData, isLoading: isAnalyzing } = useQuery({
+    queryKey: ['marketAnalysis', selectedMarketId, selectedMarket?.title],
+    queryFn: async () => {
+      if (!selectedMarket) return null;
+      
+      // Use all outcomes if available (multivariate market), otherwise create single outcome
+      const outcomes = selectedMarket.allOutcomes && selectedMarket.allOutcomes.length > 0
+        ? selectedMarket.allOutcomes.map(o => ({
+            label: o.label,
+            current_price: o.price,
+            ticker: o.ticker,
+          }))
+        : [{
+            label: selectedMarket.yesLabel,
+            current_price: selectedMarket.yesPrice,
+            ticker: selectedMarket.ticker,
+          }];
+      
+      return analyzeMarket({
+        market_title: selectedMarket.title,
+        outcomes: outcomes,
+        twitter_metrics: selectedTwitter,
+      });
+    },
+    enabled: !!selectedMarket,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
+  });
+  
+  // Convert predictions to ModelVote format
+  const selectedVotes: ModelVote[] = analysisData?.predictions.map((pred: ModelPrediction) => ({
+    id: pred.model_id,
+    name: pred.name,
+    vote: pred.vote,
+    confidence: pred.confidence,
+    reasoning: pred.reasoning,
+  })) || MODEL_VOTES[selectedMarketId] || [];
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
@@ -534,19 +825,31 @@ export default function Analyze() {
             </Badge>
           </div>
           <div className="space-y-3">
-            {MARKETS.map(market => (
-              <MarketCard 
-                key={market.id}
-                market={market}
-                isSelected={market.id === selectedMarketId}
-                onClick={() => setSelectedMarketId(market.id)}
-              />
-            ))}
+            {loading ? (
+              <div className="text-center text-slate-400 py-8">
+                Loading markets...
+              </div>
+            ) : (
+              markets.map(market => (
+                <MarketCard 
+                  key={market.id}
+                  market={market}
+                  isSelected={market.id === selectedMarketId}
+                  onClick={() => setSelectedMarketId(market.id)}
+                />
+              ))
+            )}
           </div>
         </aside>
 
         <main className="flex-1 p-6 flex flex-col min-h-0">
-          <ConsensusPanel market={selectedMarket} votes={selectedVotes} tweets={X_TWEETS[selectedMarketId] || []} />
+          <ConsensusPanel 
+            market={selectedMarket} 
+            votes={selectedVotes} 
+            tweets={X_TWEETS[selectedMarketId] || []}
+            twitterMetrics={selectedTwitter}
+            isAnalyzing={isAnalyzing}
+          />
         </main>
       </div>
     </div>

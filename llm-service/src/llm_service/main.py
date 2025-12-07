@@ -11,10 +11,13 @@ This module provides:
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+from datetime import datetime, timedelta
+import json
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from llm_service.config import Settings, configure_logging, get_logger, get_settings
 from llm_service.llm.client import LLMClient
@@ -22,14 +25,29 @@ from llm_service.llm.providers import list_available_models
 from llm_service.llm.schemas import (
     ChatRequest,
     ChatResponse,
+    ChatMessage,
     HealthResponse,
     ModelsResponse,
 )
 
+# Import Kalshi client for market data
+from kalshi.client import scrape_kalshi_feed
+from kalshi.twitter_augmentation import augment_kalshi_with_twitter
 
 # Global instances
 _llm_client: LLMClient | None = None
 _logger: logging.Logger | None = None
+
+# Simple in-memory cache for Kalshi feed
+_kalshi_cache = {
+    'data': None,
+    'timestamp': None,
+    'ttl_seconds': 300  # 5 minutes
+}
+
+# Simple in-memory cache for market analysis (keyed by market_title)
+_analysis_cache: dict[str, dict] = {}
+_analysis_cache_ttl = 300  # 5 minutes
 
 
 def get_llm_client() -> LLMClient:
@@ -115,6 +133,326 @@ async def list_models() -> ModelsResponse:
 
     models = list_available_models()
     return ModelsResponse(models=models)
+
+
+@app.get("/api/kalshi/feed", tags=["Kalshi"])
+async def get_kalshi_feed(limit: int = 10, augment_twitter: bool = True, use_cache: bool = True):
+    """
+    Fetch the Kalshi feed data, optionally augmented with Twitter metrics.
+
+    Args:
+        limit: Maximum number of events to return (default: 10)
+        augment_twitter: Whether to augment with Twitter data (default: True)
+        use_cache: Whether to use cached data if available (default: True)
+
+    Returns:
+        dict: Kalshi feed data with top events, optionally with Twitter metrics
+    """
+    logger = get_logger()
+    logger.info("Kalshi feed requested", extra={"limit": limit, "augment_twitter": augment_twitter})
+
+    # Check cache
+    if use_cache and _kalshi_cache['data'] is not None and _kalshi_cache['timestamp'] is not None:
+        cache_age = (datetime.utcnow() - _kalshi_cache['timestamp']).total_seconds()
+        if cache_age < _kalshi_cache['ttl_seconds']:
+            logger.info(f"Returning cached data (age: {cache_age:.1f}s)")
+            cached_result = _kalshi_cache['data'].copy()
+            # Apply limit to cached data
+            if "kalshi_feed" in cached_result and "feed" in cached_result["kalshi_feed"]:
+                cached_result["kalshi_feed"]["feed"] = cached_result["kalshi_feed"]["feed"][:limit]
+            cached_result["metadata"]["from_cache"] = True
+            cached_result["metadata"]["cache_age_seconds"] = round(cache_age, 1)
+            return cached_result
+
+    try:
+        feed_data = scrape_kalshi_feed()
+        
+        # Filter to top N events by volume if the feed has events
+        if "feed" in feed_data and isinstance(feed_data["feed"], list):
+            feed_data["feed"] = feed_data["feed"][:limit]
+        
+        logger.info(
+            "Kalshi feed fetched successfully",
+            extra={"event_count": len(feed_data.get("feed", []))},
+        )
+        
+        # Augment with Twitter data if requested
+        if augment_twitter:
+            logger.info("Augmenting Kalshi feed with Twitter data")
+            try:
+                # Get X API key from settings
+                settings = get_settings()
+                x_api_key = settings.x_api_key
+                
+                augmented_data = augment_kalshi_with_twitter(feed_data, x_api_key=x_api_key)
+                augmented_data["metadata"]["from_cache"] = False
+                logger.info(
+                    "Twitter augmentation complete",
+                    extra={
+                        "markets_augmented": augmented_data['metadata']['markets_augmented'],
+                        "api_calls": augmented_data['metadata']['api_calls_used']
+                    }
+                )
+                
+                # Cache the result
+                _kalshi_cache['data'] = augmented_data
+                _kalshi_cache['timestamp'] = datetime.utcnow()
+                
+                return augmented_data
+            except Exception as twitter_error:
+                logger.warning(
+                    "Twitter augmentation failed, returning Kalshi data only",
+                    extra={"error": str(twitter_error)}
+                )
+                # Return Kalshi data without Twitter augmentation
+                return {
+                    'kalshi_feed': feed_data,
+                    'twitter_augmentation': {},
+                    'metadata': {
+                        'error': str(twitter_error),
+                        'markets_augmented': 0,
+                        'api_calls_used': 0,
+                        'from_cache': False
+                    }
+                }
+        
+        # Return without augmentation
+        result = {
+            'kalshi_feed': feed_data,
+            'twitter_augmentation': {},
+            'metadata': {
+                'markets_augmented': 0,
+                'api_calls_used': 0,
+                'from_cache': False
+            }
+        }
+        
+        # Cache even if no Twitter augmentation
+        _kalshi_cache['data'] = result
+        _kalshi_cache['timestamp'] = datetime.utcnow()
+        
+        return result
+
+    except Exception as e:
+        logger.error(
+            "Failed to fetch Kalshi feed",
+            extra={"error": str(e)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch Kalshi feed: {str(e)}",
+        )
+
+
+class MarketOutcome(BaseModel):
+    """Individual outcome in a market."""
+    label: str
+    current_price: int  # Price in cents (0-100)
+    ticker: str
+
+
+class MarketAnalysisRequest(BaseModel):
+    """Request for market analysis."""
+    market_title: str
+    outcomes: list[MarketOutcome]  # All possible outcomes in this event
+    twitter_metrics: dict | None = None
+
+
+class ModelPrediction(BaseModel):
+    """Individual model's prediction."""
+    model_id: str
+    name: str
+    vote: str  # "YES" or "NO"
+    confidence: int  # 0-100
+    reasoning: str
+    timestamp: str
+
+
+class MarketAnalysisResponse(BaseModel):
+    """Response with all model predictions."""
+    market_title: str
+    predictions: list[ModelPrediction]
+    consensus: dict
+    metadata: dict
+
+
+@app.post("/api/kalshi/analyze", response_model=MarketAnalysisResponse, tags=["Kalshi"])
+async def analyze_market(request: MarketAnalysisRequest, use_cache: bool = True):
+    """
+    Analyze a market using multiple LLMs to generate predictions.
+    
+    Args:
+        request: Market details including title, price, and Twitter metrics
+        use_cache: Whether to use cached predictions (default: True)
+    
+    Returns:
+        Market analysis with predictions from multiple models
+    """
+    logger = get_logger()
+    logger.info(f"Market analysis requested for: {request.market_title}")
+    
+    # Check cache
+    cache_key = request.market_title
+    if use_cache and cache_key in _analysis_cache:
+        cached_entry = _analysis_cache[cache_key]
+        cache_age = (datetime.utcnow() - cached_entry['timestamp']).total_seconds()
+        if cache_age < _analysis_cache_ttl:
+            logger.info(f"Returning cached analysis (age: {cache_age:.1f}s)")
+            cached_result = cached_entry['data']
+            cached_result.metadata['from_cache'] = True
+            cached_result.metadata['cache_age_seconds'] = round(cache_age, 1)
+            return cached_result
+    
+    # Define models to query (using the actual models from the platform)
+    models = [
+        {"id": "grok-beta", "model_id": "grok-4-1-fast-reasoning", "name": "Grok 4.1 Fast (Reasoning)"},  # Regular Grok without search
+        {"id": "grok-beta-x", "model_id": "grok-4-1-fast-reasoning", "name": "Grok w/ X", "enable_x_search": True},  # Grok with X search enabled
+        {"id": "gpt-5.1", "model_id": "gpt-5.1", "name": "GPT-5.1"},
+        {"id": "anthropic/claude-opus-4-5-20251101", "model_id": "anthropic/claude-opus-4-5-20251101", "name": "Claude Opus 4.5"},
+        {"id": "gemini/gemini-3-pro", "model_id": "gemini/gemini-3-pro-preview", "name": "Gemini 3 Pro"},
+    ]
+    
+    # Build analysis prompt
+    twitter_context = ""
+    if request.twitter_metrics:
+        twitter_context = f"""
+Twitter Activity (Last 24h):
+- Total tweets: {request.twitter_metrics.get('total_tweets', 0)}
+- Tweet velocity (24h): {request.twitter_metrics.get('tweet_velocity_24h', 0)} tweets
+- Unique authors: {request.twitter_metrics.get('unique_authors', 0)}
+- Avg engagement rate: {request.twitter_metrics.get('avg_engagement_rate', 0):.2%}
+- Verified users: {request.twitter_metrics.get('verified_user_tweets', 0)}
+"""
+    
+    # Build list of all outcomes with their prices
+    outcomes_text = "\n".join([
+        f"  - {outcome.label}: {outcome.current_price}¢ (market implies {outcome.current_price}% probability)"
+        for outcome in request.outcomes
+    ])
+    
+    # Find the most likely outcome based on current prices
+    top_outcome = max(request.outcomes, key=lambda x: x.current_price)
+    
+    prompt = f"""You are analyzing a prediction market with multiple possible outcomes.
+
+MARKET QUESTION: {request.market_title}
+
+ALL POSSIBLE OUTCOMES:
+{outcomes_text}
+
+{twitter_context}
+
+Based on this information, which outcome do you think is most likely?
+
+Provide your analysis in this EXACT format:
+OUTCOME: [The exact label of the outcome you predict, e.g., "{top_outcome.label}"]
+CONFIDENCE: [0-100]
+REASONING: [2-3 sentences explaining why you chose this outcome. Consider current market prices, Twitter sentiment if available, and any relevant factors. Be specific about why this outcome is more likely than the others.]
+
+Important: Choose ONE outcome from the list above and use its EXACT label."""
+    
+    predictions = []
+    client = get_llm_client()
+    
+    for model in models:
+        try:
+            logger.info(f"Querying {model['name']}...")
+            
+            # Build chat request (use model_id for the actual API call)
+            chat_request = ChatRequest(
+                model=model.get("model_id", model["id"]),  # Use model_id for API, fallback to id
+                messages=[ChatMessage(role="user", content=prompt)],
+                temperature=0.7,
+                max_tokens=200,
+                x_search=model.get("enable_x_search", False)  # Enable X search if specified
+            )
+            
+            # Use async completion (supports X search)
+            response = await client.achat_completion(chat_request)
+            
+            # Parse response - handle different response formats
+            if hasattr(response, 'choices') and response.choices:
+                content = response.choices[0].message.content
+            elif hasattr(response, 'message'):
+                content = response.message.content if hasattr(response.message, 'content') else str(response.message)
+            else:
+                content = str(response)
+            
+            # Extract OUTCOME (the predicted outcome label)
+            import re
+            outcome_match = re.search(r'OUTCOME:\s*(.+?)(?:\n|$)', content)
+            predicted_outcome = outcome_match.group(1).strip() if outcome_match else request.outcomes[0].label
+            
+            # Find which outcome was predicted and convert to YES/NO
+            # (YES if they picked the first outcome, NO otherwise - for compatibility)
+            vote = "YES" if predicted_outcome == request.outcomes[0].label else "NO"
+            
+            # Extract CONFIDENCE
+            confidence = 70  # default
+            confidence_match = re.search(r'CONFIDENCE:\s*(\d+)', content)
+            if confidence_match:
+                confidence = int(confidence_match.group(1))
+            
+            # Extract REASONING
+            reasoning = content.split("REASONING:")[-1].strip()
+            if not reasoning or len(reasoning) < 10:
+                reasoning = f"Predicted outcome: {predicted_outcome}. " + content[:150]
+            
+            predictions.append(ModelPrediction(
+                model_id=model["id"],
+                name=model["name"],
+                vote=vote,
+                confidence=min(100, max(0, confidence)),
+                reasoning=reasoning,
+                timestamp=datetime.utcnow().isoformat() + 'Z'
+            ))
+            
+        except Exception as e:
+            logger.error(f"Failed to get prediction from {model['name']}: {e}", exc_info=True)
+            # Add a neutral prediction on failure - pick the highest priced outcome
+            top_outcome = max(request.outcomes, key=lambda x: x.current_price)
+            predictions.append(ModelPrediction(
+                model_id=model["id"],
+                name=model["name"],
+                vote="YES",  # Default to yes for the top outcome
+                confidence=50,
+                reasoning=f"Analysis unavailable. Error: {type(e).__name__}",
+                timestamp=datetime.utcnow().isoformat() + 'Z'
+            ))
+    
+    # Calculate consensus
+    yes_votes = [p for p in predictions if p.vote == "YES"]
+    no_votes = [p for p in predictions if p.vote == "NO"]
+    avg_confidence = sum(p.confidence for p in predictions) / len(predictions) if predictions else 0
+    
+    consensus = {
+        "recommendation": "YES" if len(yes_votes) > len(no_votes) else "NO",
+        "yes_count": len(yes_votes),
+        "no_count": len(no_votes),
+        "avg_confidence": round(avg_confidence),
+        "is_strong": abs(len(yes_votes) - len(no_votes)) >= 2
+    }
+    
+    result = MarketAnalysisResponse(
+        market_title=request.market_title,
+        predictions=predictions,
+        consensus=consensus,
+        metadata={
+            "analyzed_at": datetime.utcnow().isoformat() + 'Z',
+            "models_queried": len(models),
+            "successful_predictions": len([p for p in predictions if "error" not in p.reasoning.lower()]),
+            "from_cache": False
+        }
+    )
+    
+    # Cache the result
+    _analysis_cache[cache_key] = {
+        'data': result,
+        'timestamp': datetime.utcnow()
+    }
+    
+    return result
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
