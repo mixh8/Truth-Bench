@@ -1,10 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Link } from "wouter";
-import { FileText, LayoutDashboard, ArrowUpDown, AlertTriangle, TrendingUp, Shield, Zap } from "lucide-react";
+import { FileText, LayoutDashboard, ArrowUpDown, AlertTriangle, TrendingUp, Shield, Zap, Info } from "lucide-react";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
   switch (id) {
@@ -226,7 +227,33 @@ export default function Report() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rank</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Model</th>
-                <SortHeader field="truthScore">Truth Score</SortHeader>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors"
+                  onClick={() => handleSort('truthScore')}
+                  data-testid="sort-truthScore"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Truth Score</span>
+                    <TooltipPrimitive.Provider>
+                      <TooltipPrimitive.Root>
+                        <TooltipPrimitive.Trigger asChild>
+                          <Info className="w-3.5 h-3.5 text-slate-500 hover:text-slate-300 cursor-help" />
+                        </TooltipPrimitive.Trigger>
+                        <TooltipPrimitive.Content 
+                          className="bg-slate-800 text-slate-100 text-xs px-3 py-2 rounded border border-slate-700 max-w-xs"
+                          sideOffset={5}
+                        >
+                          Composite ranking based on: Returns (60%), Drawdown (15%), Sharpe Ratio (15%), Win Rate (10%)
+                          <TooltipPrimitive.Arrow className="fill-slate-800" />
+                        </TooltipPrimitive.Content>
+                      </TooltipPrimitive.Root>
+                    </TooltipPrimitive.Provider>
+                    <ArrowUpDown className={cn(
+                      "w-3 h-3",
+                      sortField === 'truthScore' ? "text-cyan-500" : "text-slate-600"
+                    )} />
+                  </div>
+                </th>
                 <SortHeader field="totalReturn">Total Return</SortHeader>
                 <SortHeader field="winRate">Win Rate</SortHeader>
                 <SortHeader field="sharpeRatio">Sharpe Ratio</SortHeader>
