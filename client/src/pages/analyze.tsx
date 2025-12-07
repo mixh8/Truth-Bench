@@ -327,6 +327,11 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing, co
     return factors;
   }, [votes, analysis.recommendation]);
 
+  const topPosts = useMemo<TwitterMetrics["top_posts"]>(
+    () => twitterMetrics?.top_posts ?? twitterMetrics?.top_tweets ?? [],
+    [twitterMetrics]
+  );
+
   const outcomeLabel = consensusOutcomeLabel || market.yesLabel;
   const outcomeTicker = consensusOutcomeTicker || market.ticker;
   const outcomeMatch = market.allOutcomes?.find(
@@ -530,7 +535,7 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing, co
                 <div className="col-span-2 p-3 rounded-lg bg-slate-900/50 border border-slate-800">
                   <div className="text-xs text-slate-500 mb-2">News Sources Mentioned</div>
                   <div className="flex flex-wrap gap-1">
-                    {Object.entries(twitterMetrics.news_domain_mentions).slice(0, 5).map(([domain, count]) => (
+                    {Object.entries(twitterMetrics.news_domain_mentions as Record<string, number>).slice(0, 5).map(([domain, count]) => (
                       <Badge key={domain} variant="outline" className="text-[10px] bg-slate-700 text-slate-300 border-slate-600">
                         {domain} ({count})
                       </Badge>
@@ -541,17 +546,17 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing, co
             </div>
           )}
           
-          {/* Top Tweets */}
-          {twitterMetrics && twitterMetrics.top_tweets && twitterMetrics.top_tweets.length > 0 && (
+          {/* Top Posts (X) */}
+          {topPosts.length > 0 && (
             <div className="mb-3">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Top Tweets</div>
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Top Posts</div>
             </div>
           )}
           
           <div className="space-y-3">
-            {twitterMetrics && twitterMetrics.top_tweets && twitterMetrics.top_tweets.length > 0 ? (
+            {topPosts.length > 0 ? (
               // Use real Twitter data
-              twitterMetrics.top_tweets.slice(0, 3).map(tweet => (
+              topPosts.slice(0, 3).map(tweet => (
                 <div 
                   key={tweet.id}
                   className={cn(

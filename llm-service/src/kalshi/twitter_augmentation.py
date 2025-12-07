@@ -357,7 +357,7 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key, market_quest
         recency_bonus = max(0, 48 - t['hours_ago']) * 0.5  # favor fresher tweets
         return t['engagement']['total'] + recency_bonus
     
-    top_tweets = sorted(relevant_tweets, key=_rank_score, reverse=True)[:10]
+    top_posts = sorted(relevant_tweets, key=_rank_score, reverse=True)[:10]
     
     # Calculate derived metrics
     total_tweets = len(tweets)
@@ -403,8 +403,8 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key, market_quest
         
         # Sentiment (stub for LLM)
         'sentiment_analysis': {
-            'status': 'pending_llm_analysis',
-            'top_tweets_for_analysis': [t['text'] for t in top_tweets[:5]],
+        'status': 'pending_llm_analysis',
+            'top_posts_for_analysis': [t['text'] for t in top_posts[:5]],
             'placeholder_score': None  # Will be filled by LLM
         },
         
@@ -419,8 +419,10 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key, market_quest
         'max_author_followers': max_author_followers,
         'unique_authors': len(unique_authors),
         
-        # Top tweets
-        'top_tweets': top_tweets,
+        # Top posts (X)
+        'top_posts': top_posts,
+        # Back-compat
+        'top_tweets': top_posts,
         
         # Content quality
         'tweets_with_links': tweets_with_links,
