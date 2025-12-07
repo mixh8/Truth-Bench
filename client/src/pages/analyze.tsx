@@ -37,6 +37,18 @@ interface ModelVote {
   reasoning: string;
 }
 
+interface XTweet {
+  id: string;
+  author: string;
+  handle: string;
+  avatar: string;
+  content: string;
+  timestamp: string;
+  likes: string;
+  retweets: string;
+  sentiment: 'bullish' | 'bearish';
+}
+
 const MARKETS: Market[] = [
   {
     id: 'pres-winner-28',
@@ -160,6 +172,39 @@ const MARKET_DEFINITIONS: Record<string, string> = {
   'world-leader-exit': 'This contract resolves to YES if Nicolas Maduro leaves power before year end.',
 };
 
+const X_TWEETS: Record<string, XTweet[]> = {
+  'pres-winner-28': [
+    { id: '1', author: 'Nate Silver', handle: '@NateSilver538', avatar: '📊', content: 'Early polling shows Vance with surprising crossover appeal among independents. The "new generation" messaging is testing well in focus groups.', timestamp: '2h', likes: '4.2K', retweets: '892', sentiment: 'bullish' },
+    { id: '2', author: 'Political Insider', handle: '@PoliInsider', avatar: '🏛️', content: 'BREAKING: Major GOP donors signaling strong support for Vance 2028. Campaign infrastructure already being built in key swing states.', timestamp: '5h', likes: '2.8K', retweets: '645', sentiment: 'bullish' },
+    { id: '3', author: 'Election Watch', handle: '@ElectionWatch24', avatar: '🗳️', content: 'Unpopular take: 2028 is wide open. Vance has baggage that hasnt been tested in a general. Too early to call this.', timestamp: '8h', likes: '1.1K', retweets: '234', sentiment: 'bearish' },
+  ],
+  'fed-nominee': [
+    { id: '1', author: 'WSJ Markets', handle: '@WSJMarkets', avatar: '📈', content: 'Sources close to the transition team confirm Kevin Hassett remains the frontrunner for Fed Chair nomination. Announcement expected within weeks.', timestamp: '1h', likes: '5.6K', retweets: '1.2K', sentiment: 'bullish' },
+    { id: '2', author: 'Fed Watcher', handle: '@FedWatcher', avatar: '🏦', content: 'Hassett aligns perfectly with the administration economic agenda. His past experience at CEA makes him a natural fit.', timestamp: '3h', likes: '2.1K', retweets: '456', sentiment: 'bullish' },
+    { id: '3', author: 'Econ Analyst', handle: '@EconAnalyst', avatar: '💹', content: 'Market pricing Hassett at 75% seems right. Senate confirmation should be straightforward given current composition.', timestamp: '6h', likes: '1.8K', retweets: '312', sentiment: 'bullish' },
+  ],
+  'dem-nom-28': [
+    { id: '1', author: 'CA Politics', handle: '@CAPolitics', avatar: '🌴', content: 'Newsoms national favorability rising. Recent tour of swing states generating significant media coverage and donor interest.', timestamp: '2h', likes: '3.4K', retweets: '678', sentiment: 'bullish' },
+    { id: '2', author: 'Dem Strategist', handle: '@DemStrategy', avatar: '🔵', content: 'The 2028 primary field is CROWDED. At least 8 serious candidates expected. Newsom has advantages but no lock.', timestamp: '4h', likes: '2.2K', retweets: '445', sentiment: 'bearish' },
+    { id: '3', author: 'Primary Watch', handle: '@PrimaryWatch28', avatar: '📋', content: 'Early state organizing: Newsom already has staff in IA, NH, SC. Running circles around potential competitors.', timestamp: '7h', likes: '1.5K', retweets: '289', sentiment: 'bullish' },
+  ],
+  'cabinet-exit': [
+    { id: '1', author: 'DC Insider', handle: '@DCInsider', avatar: '🏛️', content: 'Hegseth facing intensifying scrutiny. Multiple sources say internal tensions are growing. Watch this space.', timestamp: '1h', likes: '4.8K', retweets: '1.1K', sentiment: 'bullish' },
+    { id: '2', author: 'Cabinet Watch', handle: '@CabinetWatch', avatar: '👔', content: 'Historical data: first cabinet departures typically happen in months 8-14. Were entering that window now.', timestamp: '3h', likes: '1.9K', retweets: '367', sentiment: 'bullish' },
+    { id: '3', author: 'WH Correspondent', handle: '@WHCorrespondent', avatar: '📰', content: 'Despite media speculation, Hegseth has strong support from key allies. Premature to count him out.', timestamp: '5h', likes: '2.3K', retweets: '445', sentiment: 'bearish' },
+  ],
+  'house-2026': [
+    { id: '1', author: 'Cook Political', handle: '@CookPolitical', avatar: '🗳️', content: 'Midterm fundamentals heavily favor Democrats. Historical patterns suggest 25-35 seat swing is baseline expectation.', timestamp: '2h', likes: '6.2K', retweets: '1.4K', sentiment: 'bullish' },
+    { id: '2', author: 'Redistrict Watch', handle: '@RedistrictWatch', avatar: '🗺️', content: 'New maps favor Dems in MI, PA, NC. Net pickup of 8-12 seats from redistricting alone before we even look at swing seats.', timestamp: '4h', likes: '3.1K', retweets: '678', sentiment: 'bullish' },
+    { id: '3', author: 'House Forecast', handle: '@HouseForecast26', avatar: '📊', content: 'Current model: Dems 72% to win House. Economic conditions and presidential approval will be key drivers.', timestamp: '6h', likes: '2.8K', retweets: '534', sentiment: 'bullish' },
+  ],
+  'world-leader-exit': [
+    { id: '1', author: 'LatAm Analyst', handle: '@LatAmAnalyst', avatar: '🌎', content: 'Maduro has survived everything thrown at him. Opposition fragmented, military loyal, oil revenue stabilizing. Not going anywhere.', timestamp: '2h', likes: '3.2K', retweets: '567', sentiment: 'bearish' },
+    { id: '2', author: 'Venezuela Watch', handle: '@VenezuelaWatch', avatar: '🇻🇪', content: 'Despite international pressure, regime remains stable. No credible internal threat to Maduros position visible.', timestamp: '4h', likes: '2.4K', retweets: '412', sentiment: 'bearish' },
+    { id: '3', author: 'Geopolitics Now', handle: '@GeopoliticsNow', avatar: '🌐', content: 'Wild card: new US sanctions could destabilize. But even then, regime change timeline would extend well beyond year end.', timestamp: '7h', likes: '1.8K', retweets: '298', sentiment: 'bearish' },
+  ],
+};
+
 const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
   switch (id) {
     case 'grok_heavy_x': return <GrokIcon className={className} />;
@@ -219,7 +264,7 @@ function MarketCard({ market, isSelected, onClick }: { market: Market; isSelecte
   );
 }
 
-function ConsensusPanel({ market, votes }: { market: Market; votes: ModelVote[] }) {
+function ConsensusPanel({ market, votes, tweets }: { market: Market; votes: ModelVote[]; tweets: XTweet[] }) {
   const [contracts, setContracts] = useState(10);
   
   const analysis = useMemo(() => {
@@ -358,6 +403,57 @@ function ConsensusPanel({ market, votes }: { market: Market; votes: ModelVote[] 
             ))}
           </div>
         </div>
+
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">X Feed</span>
+            <Badge variant="outline" className="text-[10px] bg-slate-800 border-slate-700 text-slate-500">
+              @X
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {tweets.map(tweet => (
+              <div 
+                key={tweet.id}
+                className={cn(
+                  "p-4 rounded-lg bg-slate-900/80 border",
+                  tweet.sentiment === 'bullish' 
+                    ? "border-emerald-500/30" 
+                    : "border-rose-500/30"
+                )}
+                data-testid={`tweet-card-${tweet.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">{tweet.avatar}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-sm text-slate-200">{tweet.author}</span>
+                      <span className="text-xs text-slate-500">{tweet.handle}</span>
+                      <span className="text-xs text-slate-600">·</span>
+                      <span className="text-xs text-slate-500">{tweet.timestamp}</span>
+                    </div>
+                    <p className="text-sm text-slate-300 leading-relaxed mb-2">{tweet.content}</p>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span>❤️ {tweet.likes}</span>
+                      <span>🔁 {tweet.retweets}</span>
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-[10px] ml-auto",
+                          tweet.sentiment === 'bullish' 
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                            : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                        )}
+                      >
+                        {tweet.sentiment.toUpperCase()}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="border-t border-slate-800 pt-4 mt-4">
@@ -450,7 +546,7 @@ export default function Analyze() {
         </aside>
 
         <main className="flex-1 p-6 flex flex-col min-h-0">
-          <ConsensusPanel market={selectedMarket} votes={selectedVotes} />
+          <ConsensusPanel market={selectedMarket} votes={selectedVotes} tweets={X_TWEETS[selectedMarketId] || []} />
         </main>
       </div>
     </div>
