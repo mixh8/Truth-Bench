@@ -6,6 +6,8 @@ import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/co
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { useQuery } from "@tanstack/react-query";
+import { INITIAL_CAPITAL } from "@/lib/simulation";
 
 const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
   switch (id) {
@@ -42,65 +44,14 @@ function calculateTruthScore(totalReturn: number, maxDrawdown: number, sharpeRat
   return Math.max(0, Math.min(100, truthScore));
 }
 
-const HARDCODED_MODELS: ModelMetrics[] = [
-  {
-    id: 'grok_heavy_x',
-    name: 'Grok w/ X',
-    totalReturn: 18.50,
-    winRate: 48.0,
-    sharpeRatio: 2.85,
-    maxDrawdown: -8.20,
-    truthScore: 0,
-  },
-  {
-    id: 'grok_heavy',
-    name: 'Grok 4 Heavy',
-    totalReturn: 14.20,
-    winRate: 44.0,
-    sharpeRatio: 2.10,
-    maxDrawdown: -14.50,
-    truthScore: 0,
-  },
-  {
-    id: 'gpt_5',
-    name: 'GPT-5.1',
-    totalReturn: 10.80,
-    winRate: 41.0,
-    sharpeRatio: 1.95,
-    maxDrawdown: -16.80,
-    truthScore: 0,
-  },
-  {
-    id: 'claude_opus',
-    name: 'Claude Opus 4.5',
-    totalReturn: 7.50,
-    winRate: 38.0,
-    sharpeRatio: 2.40,
-    maxDrawdown: -9.50,
-    truthScore: 0,
-  },
-  {
-    id: 'gemini_pro',
-    name: 'Gemini 3 Pro',
-    totalReturn: 5.20,
-    winRate: 35.0,
-    sharpeRatio: 1.45,
-    maxDrawdown: -22.30,
-    truthScore: 0,
-  },
-  {
-    id: 'deepseek_v3',
-    name: 'DeepSeek-V3.2',
-    totalReturn: 2.10,
-    winRate: 29.0,
-    sharpeRatio: 0.85,
-    maxDrawdown: -31.40,
-    truthScore: 0,
-  },
-].map(model => ({
-  ...model,
-  truthScore: calculateTruthScore(model.totalReturn, model.maxDrawdown, model.sharpeRatio, model.winRate),
-}));
+const STATIC_METRICS: Record<string, { winRate: number; sharpeRatio: number; maxDrawdown: number }> = {
+  grok_heavy_x: { winRate: 48.0, sharpeRatio: 2.85, maxDrawdown: -8.20 },
+  grok_heavy: { winRate: 44.0, sharpeRatio: 2.10, maxDrawdown: -14.50 },
+  gpt_5: { winRate: 41.0, sharpeRatio: 1.95, maxDrawdown: -16.80 },
+  claude_opus: { winRate: 38.0, sharpeRatio: 2.40, maxDrawdown: -9.50 },
+  gemini_pro: { winRate: 35.0, sharpeRatio: 1.45, maxDrawdown: -22.30 },
+  deepseek_v3: { winRate: 29.0, sharpeRatio: 0.85, maxDrawdown: -31.40 },
+};
 
 function getTruthScoreLabel(score: number): { label: string; className: string } {
   if (score >= 70) return { label: 'Elite', className: 'text-cyan-400' };
@@ -148,8 +99,37 @@ export default function Report() {
   const [sortField, setSortField] = useState<SortField>('truthScore');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+  const { data: apiModels } = useQuery({
+    queryKey: ['models'],
+    queryFn: async () => {
+      const res = await fetch('/api/models');
+      if (!res.ok) throw new Error('Failed to fetch models');
+      return res.json();
+    },
+    refetchInterval: 1000,
+  });
+
+  const metrics: ModelMetrics[] = useMemo(() => {
+    if (!apiModels) return [];
+    
+    return apiModels.map((model: { id: string; name: string; currentValue: number }) => {
+      const staticMetrics = STATIC_METRICS[model.id] || { winRate: 30, sharpeRatio: 1.0, maxDrawdown: -20 };
+      const totalReturn = ((model.currentValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
+      
+      return {
+        id: model.id,
+        name: model.id === 'grok_heavy_x' ? 'Grok w/ X' : model.name,
+        totalReturn,
+        winRate: staticMetrics.winRate,
+        sharpeRatio: staticMetrics.sharpeRatio,
+        maxDrawdown: staticMetrics.maxDrawdown,
+        truthScore: calculateTruthScore(totalReturn, staticMetrics.maxDrawdown, staticMetrics.sharpeRatio, staticMetrics.winRate),
+      };
+    });
+  }, [apiModels]);
+
   const sortedMetrics = useMemo(() => {
-    const sorted = [...HARDCODED_MODELS].sort((a, b) => {
+    const sorted = [...metrics].sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
       
@@ -160,7 +140,7 @@ export default function Report() {
       return sortDirection === 'desc' ? bVal - aVal : aVal - bVal;
     });
     return sorted;
-  }, [sortField, sortDirection]);
+  }, [metrics, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -357,7 +337,7 @@ export default function Report() {
           </table>
         </div>
 
-        <RiskDeskAnalysis metrics={HARDCODED_MODELS} />
+        <RiskDeskAnalysis metrics={metrics} />
       </main>
     </div>
   );
