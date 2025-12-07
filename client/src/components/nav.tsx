@@ -1,17 +1,14 @@
 /**
  * Unified Navigation Component
  * 
- * Shared navigation bar for all TruthBench pages.
+ * Shared navigation bar for TruthBench Simulation service.
  */
 
 import { Link, useLocation } from 'wouter';
 import {
-  LayoutDashboard,
   Activity,
   Trophy,
   Eye,
-  Search,
-  FileText,
   Brain,
 } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -49,28 +46,16 @@ export function Nav() {
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold">
+            <Link href="/results" className="flex items-center gap-2 text-xl font-bold">
               <Brain className="w-6 h-6 text-emerald-400" />
-              TruthBench
+              TruthBench Simulation
             </Link>
             <div className="flex items-center gap-1">
-              <NavLink
-                href="/"
-                icon={<LayoutDashboard className="w-4 h-4" />}
-                label="Dashboard"
-                active={location === '/'}
-              />
-              <NavLink
-                href="/truthbench"
-                icon={<Activity className="w-4 h-4" />}
-                label="Simulation"
-                active={location === '/truthbench'}
-              />
               <NavLink
                 href="/results"
                 icon={<Trophy className="w-4 h-4" />}
                 label="Results"
-                active={location === '/results'}
+                active={location === '/results' || location === '/'}
               />
               <NavLink
                 href="/traces"
@@ -79,10 +64,10 @@ export function Nav() {
                 active={location === '/traces'}
               />
               <NavLink
-                href="/analyze"
-                icon={<Search className="w-4 h-4" />}
-                label="Analyze"
-                active={location === '/analyze'}
+                href="/truthbench"
+                icon={<Activity className="w-4 h-4" />}
+                label="Run Simulation"
+                active={location === '/truthbench'}
               />
             </div>
           </div>
