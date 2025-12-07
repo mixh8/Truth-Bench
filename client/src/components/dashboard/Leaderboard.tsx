@@ -1,4 +1,4 @@
-import { Model, MODELS_CONFIG, ModelId } from "@/lib/simulation";
+import { Model, MODELS_CONFIG, ModelId, INITIAL_CAPITAL } from "@/lib/simulation";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Trophy } from "lucide-react";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
@@ -21,7 +21,9 @@ interface LeaderboardProps {
 export function Leaderboard({ models }: LeaderboardProps) {
   // Filter out models that don't exist in MODELS_CONFIG
   const validModels = models.filter(model => MODELS_CONFIG[model.id as ModelId]);
-  const sortedModels = [...validModels].sort((a, b) => b.currentValue - a.currentValue);
+  const sortedModels = [...validModels].sort(
+    (a, b) => (b.currentValue ?? 0) - (a.currentValue ?? 0)
+  );
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -35,7 +37,8 @@ export function Leaderboard({ models }: LeaderboardProps) {
       
       <div className="divide-y divide-border/50">
         {sortedModels.map((model, index) => {
-          const returnPct = ((model.currentValue - 10000) / 10000) * 100;
+          const currentValue = model.currentValue ?? INITIAL_CAPITAL;
+          const returnPct = ((currentValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
           const isPositive = returnPct >= 0;
 
           return (
@@ -60,7 +63,7 @@ export function Leaderboard({ models }: LeaderboardProps) {
 
               <div className="text-right">
                 <div className="text-sm font-mono font-medium">
-                  ${model.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  ${currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
                 <div className={cn(
                   "text-xs font-mono flex items-center justify-end gap-1",
