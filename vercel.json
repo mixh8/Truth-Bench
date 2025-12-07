@@ -11,8 +11,16 @@
   ],
   "rewrites": [
     {
+      "source": "/api/truthbench/:path*",
+      "destination": "https://truth-bench.onrender.com/api/truthbench/:path*"
+    },
+    {
+      "source": "/api/kalshi/:path*",
+      "destination": "https://truth-bench.onrender.com/api/kalshi/:path*"
+    },
+    {
       "source": "/api/:path*",
-      "destination": "https://truth-bench.onrender.com/api/:path*"
+      "destination": "https://truth-bench-db.onrender.com/api/:path*"
     },
     {
       "source": "/health",
