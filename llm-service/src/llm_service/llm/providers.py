@@ -47,96 +47,48 @@ PROVIDERS: dict[ProviderType, ProviderConfig] = {
 }
 
 
-# Available models with their capabilities
+# Available models with their capabilities (Updated December 2025)
 AVAILABLE_MODELS: list[ModelInfo] = [
-    # xAI Models
+    # ==========================================================================
+    # xAI Models (Latest: Grok 4.1 - December 2025)
+    # ==========================================================================
     ModelInfo(
-        id="xai/grok-3",
+        id="xai/grok-4-1-fast-reasoning",
         provider="xai",
-        name="Grok 3",
+        name="Grok 4.1 Fast (Reasoning)",
         supports_tools=True,
         supports_web_search=True,
-        supports_vision=False,
+        supports_vision=True,
     ),
+    # ==========================================================================
+    # OpenAI Models (Latest: GPT-5.1 - December 2025)
+    # ==========================================================================
     ModelInfo(
-        id="xai/grok-3-mini-beta",
-        provider="xai",
-        name="Grok 3 Mini (Reasoning)",
-        supports_tools=True,
-        supports_web_search=True,
-        supports_vision=False,
-    ),
-    ModelInfo(
-        id="xai/grok-2-vision-latest",
-        provider="xai",
-        name="Grok 2 Vision",
+        id="gpt-5.1",
+        provider="openai",
+        name="GPT-5.1",
         supports_tools=True,
         supports_web_search=False,
         supports_vision=True,
     ),
+    # ==========================================================================
+    # Anthropic Models (Latest: Claude Opus 4.5 - December 2025)
+    # ==========================================================================
     ModelInfo(
-        id="xai/grok-2-latest",
-        provider="xai",
-        name="Grok 2",
-        supports_tools=True,
-        supports_web_search=True,
-        supports_vision=False,
-    ),
-    # OpenAI Models
-    ModelInfo(
-        id="gpt-4o",
-        provider="openai",
-        name="GPT-4o",
-        supports_tools=True,
-        supports_web_search=False,
-        supports_vision=True,
-    ),
-    ModelInfo(
-        id="gpt-4o-mini",
-        provider="openai",
-        name="GPT-4o Mini",
-        supports_tools=True,
-        supports_web_search=False,
-        supports_vision=True,
-    ),
-    ModelInfo(
-        id="openai/gpt-4o-search-preview",
-        provider="openai",
-        name="GPT-4o Search Preview",
-        supports_tools=True,
-        supports_web_search=True,
-        supports_vision=False,
-    ),
-    # Anthropic Models
-    ModelInfo(
-        id="anthropic/claude-sonnet-4-20250514",
+        id="anthropic/claude-opus-4-5-20251101",
         provider="anthropic",
-        name="Claude Sonnet 4",
+        name="Claude Opus 4.5",
         supports_tools=True,
         supports_web_search=True,
         supports_vision=True,
     ),
+    # ==========================================================================
+    # Google Models (Latest: Gemini 3 Pro - December 2025)
+    # ==========================================================================
     ModelInfo(
-        id="anthropic/claude-3-5-sonnet-latest",
-        provider="anthropic",
-        name="Claude 3.5 Sonnet",
-        supports_tools=True,
-        supports_web_search=True,
-        supports_vision=True,
-    ),
-    # Google Models
-    ModelInfo(
-        id="gemini/gemini-1.5-pro",
+        id="gemini/gemini-3-pro-preview",
         provider="google",
-        name="Gemini 1.5 Pro",
-        supports_tools=True,
-        supports_web_search=False,
-        supports_vision=True,
-    ),
-    ModelInfo(
-        id="gemini/gemini-2.0-flash",
-        provider="google",
-        name="Gemini 2.0 Flash",
+        name="Gemini 3 Pro",
         supports_tools=True,
         supports_web_search=True,
         supports_vision=True,
@@ -198,7 +150,9 @@ def get_provider_for_model(model_id: str) -> ProviderType | None:
     # OpenAI: openai/ prefix or gpt/o1/o3 models
     if (
         model_lower.startswith("openai/")
-        or model_lower.startswith("gpt")
+        or model_lower.startswith("gpt-")
+        or model_lower.startswith("gpt-4")
+        or model_lower.startswith("gpt-5")
         or model_lower.startswith("o1")
         or model_lower.startswith("o3")
     ):
