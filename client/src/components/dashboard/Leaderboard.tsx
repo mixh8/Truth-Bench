@@ -1,6 +1,19 @@
 import { Model } from "@/lib/simulation";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Trophy } from "lucide-react";
+import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
+
+const ModelIcon = ({ id, className }: { id: string, className?: string }) => {
+  switch (id) {
+    case 'grok_heavy_x': return <GrokIcon className={className} />;
+    case 'grok_heavy': return <GrokIcon className={className} />;
+    case 'gemini_pro': return <GeminiIcon className={className} />;
+    case 'claude_opus': return <ClaudeIcon className={className} />;
+    case 'gpt_5': return <OpenAIIcon className={className} />;
+    case 'deepseek_v3': return <DeepSeekIcon className={className} />;
+    default: return null;
+  }
+};
 
 interface LeaderboardProps {
   models: Model[];
@@ -39,7 +52,7 @@ export function Leaderboard({ models }: LeaderboardProps) {
                 <div className="flex flex-col">
                     <div className="flex items-center gap-2">
                          <span className="text-sm font-medium">{model.name}</span>
-                         <span className="text-xs opacity-50 grayscale">{model.avatar}</span>
+                         <ModelIcon id={model.id} className="w-3 h-3 text-muted-foreground" />
                     </div>
                 </div>
               </div>
