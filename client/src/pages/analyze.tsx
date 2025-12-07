@@ -348,7 +348,7 @@ function ConsensusPanel({ market, votes }: { market: Market; votes: ModelVote[] 
                 data-testid={`vote-badge-${vote.id}`}
               >
                 <ModelIcon id={vote.id} className="w-4 h-4 text-slate-400" />
-                <span className="text-xs text-slate-300 flex-1 truncate">{vote.name.split(' ')[0]}</span>
+                <span className="text-xs text-slate-300 flex-1 truncate">{vote.id === 'grok_heavy_x' ? 'Grok w/ X' : vote.name.split(' ')[0]}</span>
                 {vote.vote === 'YES' ? (
                   <CheckCircle className="w-4 h-4 text-emerald-400" />
                 ) : (
