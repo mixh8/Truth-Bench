@@ -6,6 +6,7 @@ import { ModelStream } from "@/components/dashboard/ModelStream";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RefreshCw } from "lucide-react";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default function Dashboard() {
   const { models, events, isPlaying, setIsPlaying } = useSimulation();
@@ -40,6 +41,7 @@ export default function Dashboard() {
                 <Button variant="outline" size="icon">
                     <RefreshCw className="w-4 h-4" />
                 </Button>
+                <ModeToggle />
             </div>
         </header>
 

@@ -42,53 +42,66 @@
   --radius-lg: var(--radius);
 }
 
-:root {
-  /* Dark Mode Default for this app */
-  --background: 240 10% 4%; /* #09090b - Very dark */
-  --foreground: 0 0% 98%;
-
-  --card: 240 10% 7%; /* Slightly lighter than bg */
-  --card-foreground: 0 0% 98%;
-
-  --popover: 240 10% 7%;
-  --popover-foreground: 0 0% 98%;
-
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-
-  --radius: 0.5rem;
-
-  /* Model Colors */
-  --model-grok-x: 0 0% 100%;      /* White for X version */
-  --model-grok: 300 100% 60%;     /* Bright Magenta for Heavy */
-  --model-claude: 24 95% 53%;     /* Orange */
-  --model-gpt: 142 71% 45%;       /* Green */
-  --model-deepseek: 217 91% 60%;  /* Blue */
-  --model-gemini: 280 80% 60%;    /* Purple */
-}
-
-/* Force dark mode */
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+    --radius: 0.5rem;
+
+    /* Model Colors - Light Mode */
+    --model-grok-x: 0 0% 0%;      /* Black for X version */
+    --model-grok: 300 100% 35%;   /* Darker Magenta */
+    --model-claude: 24 95% 50%;   /* Darker Orange */
+    --model-gpt: 142 71% 35%;     /* Darker Green */
+    --model-deepseek: 217 91% 50%;/* Darker Blue */
+    --model-gemini: 280 80% 50%;  /* Darker Purple */
+  }
+
+  .dark {
     --background: 240 10% 4%;
     --foreground: 0 0% 98%;
-    /* Keep dark tokens even in light mode preference */
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+
+    /* Model Colors - Dark Mode */
+    --model-grok-x: 0 0% 100%;      /* White */
+    --model-grok: 300 100% 60%;     /* Bright Magenta */
+    --model-claude: 24 95% 53%;     /* Orange */
+    --model-gpt: 142 71% 45%;       /* Green */
+    --model-deepseek: 217 91% 60%;  /* Blue */
+    --model-gemini: 280 80% 60%;    /* Purple */
   }
 }
 
