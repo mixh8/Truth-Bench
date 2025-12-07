@@ -48,7 +48,13 @@ import {
 } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-const API_BASE = 'http://127.0.0.1:8000';
+// Use environment variable or default to Render deployment in production
+const API_BASE = (
+  import.meta.env.VITE_LLM_SERVICE_URL ??
+  (import.meta.env.MODE === 'production' 
+    ? 'https://truth-bench-python.onrender.com' 
+    : 'http://localhost:8000')
+).replace(/\/+$/, '');
 
 // Types
 interface TraceListItem {
