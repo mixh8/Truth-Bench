@@ -185,3 +185,107 @@ class KalshiClient:
             snapshots.append(snapshot)
 
         return snapshots
+
+    def get_political_series(self) -> list[dict]:
+        """Fetch all series in the Politics category.
+
+        Returns:
+            List of series dictionaries containing ticker, title, category, etc.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.debug("Fetching political series from Kalshi API")
+        response = self._get("/series", params={"category": "Politics"})
+        series = response.get("series", [])
+        logger.info(f"Retrieved {len(series)} political series")
+        
+        return series
+
+    def get_settled_markets(
+        self,
+        series_ticker: str,
+        min_close_ts: int | None = None,
+        max_close_ts: int | None = None,
+        limit: int = 1000,
+    ) -> list[dict]:
+        """Fetch settled markets for a specific series.
+
+        Args:
+            series_ticker: The series ticker to filter by.
+            min_close_ts: Minimum close timestamp (Unix seconds).
+            max_close_ts: Maximum close timestamp (Unix seconds).
+            limit: Maximum number of markets per page (max 1000).
+
+        Returns:
+            List of settled market dictionaries.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.debug(f"Fetching settled markets for series: {series_ticker}")
+        markets = []
+        cursor = None
+
+        while True:
+            params = {
+                "series_ticker": series_ticker,
+                "status": "settled",
+                "limit": limit,
+            }
+            if min_close_ts:
+                params["min_close_ts"] = min_close_ts
+            if max_close_ts:
+                params["max_close_ts"] = max_close_ts
+            if cursor:
+                params["cursor"] = cursor
+
+            response = self._get("/markets", params=params)
+            batch = response.get("markets", [])
+            markets.extend(batch)
+            logger.debug(f"Retrieved batch of {len(batch)} markets, total: {len(markets)}")
+
+            cursor = response.get("cursor")
+            if not cursor:
+                break
+
+        logger.info(f"Retrieved {len(markets)} settled markets for series {series_ticker}")
+        return markets
+
+    def get_market_candlesticks(
+        self,
+        series_ticker: str,
+        market_ticker: str,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+        period_interval: int = 60,
+    ) -> list[dict]:
+        """Fetch OHLC price history with bid/ask spreads for a market.
+
+        Args:
+            series_ticker: The series ticker containing the market.
+            market_ticker: The market ticker.
+            start_ts: Start timestamp (Unix seconds).
+            end_ts: End timestamp (Unix seconds).
+            period_interval: Candlestick period in minutes (1, 60, or 1440).
+
+        Returns:
+            List of candlestick dictionaries with OHLC and bid/ask data.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.debug(f"Fetching candlesticks for market: {market_ticker}")
+        
+        params = {"period_interval": period_interval}
+        if start_ts:
+            params["start_ts"] = start_ts
+        if end_ts:
+            params["end_ts"] = end_ts
+
+        endpoint = f"/series/{series_ticker}/markets/{market_ticker}/candlesticks"
+        response = self._get(endpoint, params=params)
+        candlesticks = response.get("candlesticks", [])
+        
+        logger.info(f"Retrieved {len(candlesticks)} candlesticks for {market_ticker}")
+        return candlesticks
