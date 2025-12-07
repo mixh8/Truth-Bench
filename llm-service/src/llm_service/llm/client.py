@@ -21,11 +21,19 @@ from typing import Any
 import litellm
 from litellm import acompletion, aresponses, completion, responses
 
-# xAI SDK for native X search support
-from xai_sdk import Client as XaiClient
-from xai_sdk.chat import system as xai_system
-from xai_sdk.chat import user as xai_user
-from xai_sdk.tools import x_search as xai_x_search
+# xAI SDK for native X search support (optional - not needed for basic LLM calls)
+try:
+    from xai_sdk import Client as XaiClient
+    from xai_sdk.chat import system as xai_system
+    from xai_sdk.chat import user as xai_user
+    from xai_sdk.tools import x_search as xai_x_search
+    XAI_SDK_AVAILABLE = True
+except ImportError:
+    XAI_SDK_AVAILABLE = False
+    XaiClient = None
+    xai_system = None
+    xai_user = None
+    xai_x_search = None
 
 from llm_service.config import Settings, get_logger
 from llm_service.llm.providers import get_model_info, get_provider_for_model
@@ -513,6 +521,7 @@ class LLMClient:
         Determine if we should use xAI SDK instead of LiteLLM.
 
         Uses xAI SDK when:
+        - xai-sdk is installed AND
         - x_search is enabled AND
         - Model is an xAI model (grok-*)
 
@@ -522,6 +531,13 @@ class LLMClient:
         Returns:
             True if should use xAI SDK
         """
+        if not XAI_SDK_AVAILABLE:
+            if request.x_search:
+                self.logger.warning(
+                    "X search requested but xai-sdk not installed. Using LiteLLM instead."
+                )
+            return False
+
         if not request.x_search:
             return False
 

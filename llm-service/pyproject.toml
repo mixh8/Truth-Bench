@@ -6,26 +6,23 @@ readme = "README.md"
 authors = [
     { name = "renesultan", email = "rene.sultan4@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.124.0",
-    "litellm>=1.80.8",
-    "pydantic>=2.12.5",
-    "pydantic-settings>=2.12.0",
-    "python-dotenv>=1.2.1",
+    "fastapi>=0.115.0",
+    "litellm>=1.55.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.0",
     "requests>=2.31.0",
-    "uvicorn[standard]>=0.38.0",
-    "xai-sdk>=0.1.0",
+    "uvicorn[standard]>=0.32.0",
 ]
 
 [project.scripts]
 llm-service = "llm_service.main:main"
 
 [build-system]
-requires = ["uv_build>=0.8.13,<0.9.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.uv]
-package = true
-# Override grpcio version to resolve conflict between litellm and xai-sdk
-override-dependencies = ["grpcio>=1.72.1"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_service"]
