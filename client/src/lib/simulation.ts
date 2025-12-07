@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5';
 
@@ -121,50 +121,12 @@ const parseHistory = (history: any): { time: number; value: number }[] => {
 };
 
 export function useSimulation() {
-  const queryClient = useQueryClient();
   const [localModels, setLocalModels] = useState<Model[]>([]);
   const [localEvents, setLocalEvents] = useState<MarketEvent[]>([]);
   const [localTotalVolume, setLocalTotalVolume] = useState(1200000);
   const [isPlaying, setIsPlaying] = useState(true);
-  const timeRef = useRef(Date.now());
-  const initializeModelsOnce = useRef(false);
-  const [tradeIndex, setTradeIndex] = useState(0);
-  const nextIntervalRef = useRef(2000 + Math.random() * 8000);
-  const seededEventsRef = useRef<MarketEvent[]>([]);
 
-  // Mutations - must be created unconditionally at hook level
-  const updateModelMutation = useMutation({
-    mutationFn: (payload: { id: string; currentValue: number; history: { time: number; value: number }[] }) =>
-      fetch(`/api/models/${payload.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentValue: payload.currentValue, history: payload.history })
-      }).then(r => r.json()),
-  });
-
-  const createEventMutation = useMutation({
-    mutationFn: (event: Omit<MarketEvent, 'id' | 'timestamp'> & { timestamp?: number }) =>
-      fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event)
-      }).then(r => r.json()),
-    onSuccess: (newEvent) => {
-      setLocalEvents(prev => [newEvent, ...prev].slice(0, 5));
-      queryClient.setQueryData(['events'], (old: MarketEvent[]) => [newEvent, ...old].slice(0, 5));
-    }
-  });
-
-  const updateStateMutation = useMutation({
-    mutationFn: (state: { totalVolume?: number; isPlaying?: number }) =>
-      fetch('/api/market-state', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state)
-      }).then(r => r.json()),
-  });
-
-  // Fetch initial data
+  // Fetch data from backend (read-only, backend handles updates)
   const { data: apiModels } = useQuery({
     queryKey: ['models'],
     queryFn: async () => {
@@ -172,7 +134,8 @@ export function useSimulation() {
       if (!res.ok) throw new Error('Failed to fetch models');
       return res.json() as Promise<Model[]>;
     },
-    staleTime: 5000,
+    staleTime: 500,
+    refetchInterval: 1000, // Poll every 1 second to get backend updates
   });
 
   const { data: apiEvents } = useQuery({
@@ -182,17 +145,8 @@ export function useSimulation() {
       if (!res.ok) throw new Error('Failed to fetch events');
       return res.json() as Promise<MarketEvent[]>;
     },
-    staleTime: 5000,
-  });
-
-  const { data: allSeededEvents } = useQuery({
-    queryKey: ['allSeededEvents'],
-    queryFn: async () => {
-      const res = await fetch('/api/events/all');
-      if (!res.ok) throw new Error('Failed to fetch seeded events');
-      return res.json() as Promise<MarketEvent[]>;
-    },
-    staleTime: Infinity,
+    staleTime: 500,
+    refetchInterval: 1000, // Poll every 1 second to get backend updates
   });
 
   const { data: marketState } = useQuery({
@@ -202,35 +156,11 @@ export function useSimulation() {
       if (!res.ok) throw new Error('Failed to fetch market state');
       return res.json();
     },
-    staleTime: 5000,
+    staleTime: 500,
+    refetchInterval: 1000, // Poll every 1 second to get backend updates
   });
 
-  // Initialize models in database if needed
-  useEffect(() => {
-    if (!initializeModelsOnce.current && !apiModels) {
-      initializeModelsOnce.current = true;
-      const startTime = Date.now() - 1000 * 60 * 60 * 24;
-      Object.entries(MODELS_CONFIG).forEach(([modelId, config]) => {
-        const history = Array.from({ length: 24 }, (_, i) => ({
-          time: startTime + i * 1000 * 60 * 60,
-          value: INITIAL_CAPITAL
-        }));
-        const { id, ...configWithoutId } = config;
-        fetch('/api/models', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: modelId,
-            ...configWithoutId,
-            currentValue: INITIAL_CAPITAL,
-            history,
-          })
-        }).catch(() => {});
-      });
-    }
-  }, [apiModels]);
-
-  // Set local state when API data loads
+  // Set local state when API data loads (backend is the source of truth)
   useEffect(() => {
     if (apiModels?.length) {
       const models = apiModels.map(m => ({
@@ -262,96 +192,6 @@ export function useSimulation() {
       setLocalTotalVolume(marketState.totalVolume);
     }
   }, [marketState]);
-
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      timeRef.current = now;
-
-      setLocalModels(prevModels => {
-        const updated = prevModels.map(model => {
-          let trend = 0;
-          let volatility = model.riskFactor * 50;
-          
-          if (model.id === 'grok_heavy_x') {
-             trend = 4 + Math.random() * 4;
-             volatility *= 1.1; 
-          } else if (model.id === 'grok_heavy') {
-             trend = 2 + Math.random() * 3;
-          } else {
-             trend = (Math.random() - 0.48) * 8;
-          }
-
-          const change = trend + (Math.random() - 0.5) * volatility * 3;
-          const newValue = model.currentValue + change;
-          const history = parseHistory(model.history);
-
-          const newHistory = [...history, { time: now, value: newValue }].slice(-50);
-          const newModel = {
-            ...model,
-            currentValue: newValue,
-            history: newHistory
-          };
-
-          updateModelMutation.mutate({
-            id: model.id,
-            currentValue: newValue,
-            history: newHistory
-          });
-          return newModel;
-        });
-        return updated;
-      });
-
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, updateModelMutation]);
-
-  useEffect(() => {
-    if (allSeededEvents?.length) {
-      seededEventsRef.current = allSeededEvents;
-    }
-  }, [allSeededEvents]);
-
-  const hasSeededEvents = Boolean(allSeededEvents?.length);
-
-  useEffect(() => {
-    if (!isPlaying || !hasSeededEvents || !seededEventsRef.current.length) return;
-
-    const advanceTrade = () => {
-      const events = seededEventsRef.current;
-      if (!events.length) return;
-      
-      setTradeIndex(prev => {
-        const nextIndex = (prev + 1) % events.length;
-        const startIdx = Math.max(0, nextIndex - 4);
-        const visibleTrades = events.slice(startIdx, nextIndex + 1).reverse();
-        setLocalEvents(visibleTrades);
-        return nextIndex;
-      });
-      
-      const tradeAmount = Math.floor(Math.random() * 45000) + 5000;
-      setLocalTotalVolume(vol => vol + tradeAmount);
-      
-      nextIntervalRef.current = 2000 + Math.random() * 8000;
-    };
-
-    advanceTrade();
-
-    const scheduleNext = () => {
-      return setTimeout(() => {
-        advanceTrade();
-        timeoutId = scheduleNext();
-      }, nextIntervalRef.current);
-    };
-
-    let timeoutId = scheduleNext();
-
-    return () => clearTimeout(timeoutId);
-  }, [isPlaying, hasSeededEvents]);
 
   return { models: localModels, events: localEvents, totalVolume: localTotalVolume, isPlaying, setIsPlaying };
 }

@@ -9,6 +9,7 @@ This module provides:
 """
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from datetime import datetime, timedelta
@@ -278,6 +279,72 @@ class MarketAnalysisResponse(BaseModel):
     metadata: dict
 
 
+@app.post("/api/kalshi/markets/batch", tags=["Kalshi"])
+async def get_markets_batch(request: dict):
+    """
+    Fetch specific markets by their tickers (for pricing open positions).
+    
+    Request body:
+    {
+        "tickers": ["PRES-28", "FED-DEC", ...]
+    }
+    
+    Returns market data including current prices for each ticker.
+    """
+    logger = get_logger()
+    tickers = request.get("tickers", [])
+    
+    if not tickers:
+        return {"markets": []}
+    
+    logger.info(f"Fetching {len(tickers)} specific markets: {tickers}")
+    
+    try:
+        from kalshi.client import KalshiClient
+        client = KalshiClient(use_demo=False)
+        
+        markets = []
+        for ticker in tickers:
+            try:
+                # Fetch market data via the trade API
+                response = client._get(f"/markets/{ticker}")
+                market_data = response.get("market", {})
+                
+                if market_data:
+                    markets.append({
+                        "ticker": market_data.get("ticker", ticker),
+                        "title": market_data.get("title", ""),
+                        "last_price": market_data.get("last_price", 0) or 0,
+                        "yes_bid": market_data.get("yes_bid", 0) or 0,
+                        "yes_ask": market_data.get("yes_ask", 0) or 0,
+                        "no_bid": market_data.get("no_bid", 0) or 0,
+                        "no_ask": market_data.get("no_ask", 0) or 0,
+                        "close_time": market_data.get("close_time"),
+                        "status": market_data.get("status", ""),
+                    })
+            except Exception as market_error:
+                logger.warning(f"Failed to fetch market {ticker}: {market_error}")
+                # Return placeholder with entry price if market not found
+                markets.append({
+                    "ticker": ticker,
+                    "title": f"Unknown Market ({ticker})",
+                    "last_price": 0,
+                    "yes_bid": 0,
+                    "yes_ask": 0,
+                    "no_bid": 0,
+                    "no_ask": 0,
+                    "close_time": None,
+                    "status": "unknown",
+                })
+        
+        logger.info(f"Successfully fetched {len(markets)} markets")
+        return {"markets": markets}
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch markets batch: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch markets: {str(e)}")
+
+
 @app.post("/api/kalshi/analyze", response_model=MarketAnalysisResponse, tags=["Kalshi"])
 async def analyze_market(request: MarketAnalysisRequest, use_cache: bool = True):
     """
@@ -353,10 +420,10 @@ REASONING: [2-3 sentences explaining why you chose this outcome. Consider curren
 
 Important: Choose ONE outcome from the list above and use its EXACT label."""
     
-    predictions = []
     client = get_llm_client()
     
-    for model in models:
+    # Define async function to query a single model
+    async def query_model(model):
         try:
             logger.info(f"Querying {model['name']}...")
             
@@ -383,11 +450,11 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
             # Extract OUTCOME (the predicted outcome label)
             import re
             outcome_match = re.search(r'OUTCOME:\s*(.+?)(?:\n|$)', content)
-            predicted_outcome = outcome_match.group(1).strip() if outcome_match else request.outcomes[0].label
+            predicted_outcome = outcome_match.group(1).strip() if outcome_match else top_outcome.label
             
             # Find which outcome was predicted and convert to YES/NO
-            # (YES if they picked the first outcome, NO otherwise - for compatibility)
-            vote = "YES" if predicted_outcome == request.outcomes[0].label else "NO"
+            # (YES if they picked the top outcome, NO otherwise - for compatibility)
+            vote = "YES" if predicted_outcome == top_outcome.label else "NO"
             
             # Extract CONFIDENCE
             confidence = 70  # default
@@ -400,27 +467,31 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
             if not reasoning or len(reasoning) < 10:
                 reasoning = f"Predicted outcome: {predicted_outcome}. " + content[:150]
             
-            predictions.append(ModelPrediction(
+            return ModelPrediction(
                 model_id=model["id"],
                 name=model["name"],
                 vote=vote,
+                predicted_outcome=predicted_outcome,
                 confidence=min(100, max(0, confidence)),
                 reasoning=reasoning,
                 timestamp=datetime.utcnow().isoformat() + 'Z'
-            ))
+            )
             
         except Exception as e:
             logger.error(f"Failed to get prediction from {model['name']}: {e}", exc_info=True)
             # Add a neutral prediction on failure - pick the highest priced outcome
-            top_outcome = max(request.outcomes, key=lambda x: x.current_price)
-            predictions.append(ModelPrediction(
+            return ModelPrediction(
                 model_id=model["id"],
                 name=model["name"],
                 vote="YES",  # Default to yes for the top outcome
+                predicted_outcome=top_outcome.label,
                 confidence=50,
                 reasoning=f"Analysis unavailable. Error: {type(e).__name__}",
                 timestamp=datetime.utcnow().isoformat() + 'Z'
-            ))
+            )
+    
+    # Run ALL models in parallel using asyncio.gather for 5x speedup!
+    predictions = await asyncio.gather(*[query_model(m) for m in models])
     
     # Calculate consensus
     yes_votes = [p for p in predictions if p.vote == "YES"]
