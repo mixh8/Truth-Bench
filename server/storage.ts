@@ -12,7 +12,7 @@ import {
   marketEvents,
   marketState
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
@@ -30,6 +30,8 @@ export interface IStorage {
   // Market event operations
   createEvent(event: InsertMarketEvent): Promise<MarketEvent>;
   getRecentEvents(count: number): Promise<MarketEvent[]>;
+  getAllEventsOrdered(): Promise<MarketEvent[]>;
+  getEventCount(): Promise<number>;
   
   // Market state operations
   getMarketState(): Promise<MarketState | undefined>;
@@ -93,6 +95,18 @@ export class PGStorage implements IStorage {
       .from(marketEvents)
       .orderBy(desc(marketEvents.timestamp))
       .limit(count);
+  }
+
+  async getAllEventsOrdered(): Promise<MarketEvent[]> {
+    return db
+      .select()
+      .from(marketEvents)
+      .orderBy(asc(marketEvents.timestamp));
+  }
+
+  async getEventCount(): Promise<number> {
+    const result = await db.select().from(marketEvents);
+    return result.length;
   }
 
   async getMarketState(): Promise<MarketState | undefined> {

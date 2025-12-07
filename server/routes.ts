@@ -3,11 +3,26 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { insertMarketEventSchema, insertModelSchema } from "@shared/schema";
+import { seedTrades } from "./seedTrades";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Seed trades on startup
+  await seedTrades();
+
+  // Get all events ordered by timestamp (for cycling through)
+  app.get("/api/events/all", async (req, res) => {
+    try {
+      const events = await storage.getAllEventsOrdered();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching all events:", error);
+      res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
   // Create or update a model
   app.post("/api/models", async (req, res) => {
     try {
