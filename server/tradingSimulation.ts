@@ -120,19 +120,6 @@ export async function initializePortfolios() {
   }
   
   console.log('[Trading] Portfolios initialized for all models');
-  
-  // Create initial status event for the feed
-  try {
-    await storage.createEvent({
-      modelId: 'grok_heavy_x',
-      market: 'Live Trading System',
-      action: 'Hold',
-      comment: '🚀 Truth Bench trading simulation started. Models will analyze live Kalshi markets and execute trades based on LLM predictions. First trading cycle in 10 seconds...',
-      profit: 0,
-    });
-  } catch (error) {
-    console.log('[Trading] Could not create startup event (database may not be ready yet)');
-  }
 }
 
 /**
@@ -161,7 +148,7 @@ async function fetchLiveMarkets(): Promise<any[]> {
     // Transform to market format
     const markets = events
       .filter((event: any) => event.markets && event.markets.length > 0)
-      .slice(0, 5)  // Limit to 5 most liquid markets
+      .slice(0, 10)  // Limit to 10 most liquid markets (more opportunities)
       .map((event: any) => {
         const market = event.markets[0]; // Use first market
         
@@ -170,6 +157,8 @@ async function fetchLiveMarkets(): Promise<any[]> {
         if (market.close_time || event.close_time) {
           closeTime = new Date(market.close_time || event.close_time);
         }
+        
+        const eventTicker = event.event_ticker || event.series_ticker || '';
         
         return {
           ticker: market.ticker || event.event_ticker || '',
@@ -180,7 +169,8 @@ async function fetchLiveMarkets(): Promise<any[]> {
           volume: event.total_volume || 0,
           seriesTicker: event.series_ticker || event.event_ticker,
           twitterMetrics: data.twitter_augmentation?.[event.series_ticker]?.twitter_metrics,
-          closeTime
+          closeTime,
+          marketUrl: eventTicker ? `https://kalshi.com/events/${eventTicker}` : undefined
         };
       });
     
@@ -198,55 +188,71 @@ async function fetchLiveMarkets(): Promise<any[]> {
 }
 
 /**
- * Get LLM prediction for a specific market
+ * Get bulk LLM predictions for multiple markets in a single call
  */
-async function getLLMPrediction(market: any, modelId: ModelId): Promise<{ vote: 'YES' | 'NO', confidence: number, reasoning: string } | null> {
+async function getBulkLLMPredictions(
+  markets: any[], 
+  modelId: ModelId
+): Promise<Map<string, { vote: 'YES' | 'NO', confidence: number, reasoning: string }>> {
+  const predictions = new Map<string, { vote: 'YES' | 'NO', confidence: number, reasoning: string }>();
+  
+  if (markets.length === 0) {
+    return predictions;
+  }
+  
   try {
-    const response = await fetch(`${LLM_SERVICE_URL}/api/kalshi/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        market_title: market.title,
-        outcomes: [{
-          label: 'YES',
-          current_price: market.yesPrice,
-          ticker: market.ticker
-        }],
-        twitter_metrics: market.twitterMetrics || null
-      })
-    });
-    
-    if (!response.ok) {
-      console.error(`[Trading] LLM analysis failed for ${modelId}:`, response.status);
-      return null;
-    }
-    
-    const analysis = await response.json();
-    
-    // Map our model IDs to the ones used in the analysis
+    // Map our model IDs to the ones used in the Python backend AVAILABLE_MODELS
     const modelIdMap: Record<ModelId, string> = {
-      'grok_heavy_x': 'grok-beta-x',
-      'grok_heavy': 'grok-beta',
+      'grok_heavy_x': 'grok-x',
+      'grok_heavy': 'grok',
       'gemini_pro': 'gemini/gemini-3-pro',
       'claude_opus': 'anthropic/claude-opus-4-5-20251101',
       'gpt_5': 'gpt-5.1'
     };
     
-    const prediction = analysis.predictions?.find((p: any) => p.model_id === modelIdMap[modelId]);
+    const response = await fetch(`${LLM_SERVICE_URL}/api/kalshi/analyze-bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: markets.map(m => ({
+          market_title: m.title,
+          ticker: m.ticker,
+          outcomes: [{
+            label: 'YES',
+            current_price: m.yesPrice,
+            ticker: m.ticker
+          }],
+          twitter_metrics: m.twitterMetrics || null
+        })),
+        model_id: modelIdMap[modelId]
+      })
+    });
     
-    if (!prediction) {
-      console.error(`[Trading] No prediction found for model ${modelId}`);
-      return null;
+    if (!response.ok) {
+      console.error(`[Trading] Bulk LLM analysis failed for ${modelId}:`, response.status);
+      return predictions;
     }
     
-    return {
-      vote: prediction.vote,
-      confidence: prediction.confidence,
-      reasoning: prediction.reasoning
-    };
+    const analysis = await response.json();
+    
+    // Map predictions by ticker
+    if (analysis.predictions && Array.isArray(analysis.predictions)) {
+      for (const pred of analysis.predictions) {
+        if (pred.ticker) {
+          predictions.set(pred.ticker, {
+            vote: pred.vote,
+            confidence: pred.confidence,
+            reasoning: pred.reasoning
+          });
+        }
+      }
+    }
+    
+    console.log(`[Trading] ${modelId} received ${predictions.size} predictions`);
+    return predictions;
   } catch (error) {
-    console.error(`[Trading] Error getting LLM prediction for ${modelId}:`, error);
-    return null;
+    console.error(`[Trading] Error getting bulk LLM predictions for ${modelId}:`, error);
+    return predictions;
   }
 }
 
@@ -310,8 +316,11 @@ async function calculatePortfolioValue(
   for (const [ticker, position] of Array.from(portfolio.positions.entries())) {
     const market = allMarkets.find(m => m.ticker === ticker);
     if (market) {
-      const currentPrice = (position.side === 'YES' ? market.last_price : (100 - market.last_price)) / 100;
+      // Use yesPrice/noPrice from our market format (in cents)
+      const currentPriceCents = position.side === 'YES' ? market.yesPrice : market.noPrice;
+      const currentPrice = currentPriceCents / 100; // Convert to decimal
       value += position.contracts * currentPrice;
+      console.log(`[Portfolio] ${ticker} ${position.side} position valued at ${currentPriceCents}¢ = $${(position.contracts * currentPrice).toFixed(2)}`);
     } else {
       // Market not found (maybe settled/closed), use entry price as fallback
       console.warn(`[Portfolio] Market ${ticker} not found, using entry price`);
@@ -385,6 +394,7 @@ async function executeTrade(
     await storage.createEvent({
       modelId,
       market: market.title,
+      marketUrl: market.marketUrl,
       action: 'Buy',
       comment: `Buying ${side} @ ${(price * 100).toFixed(1)}¢ | ${reasoning.slice(0, 120)}... [${confidence}% conf]`,
       profit: 0,
@@ -416,6 +426,7 @@ async function executeTrade(
     await storage.createEvent({
       modelId,
       market: market.title,
+      marketUrl: market.marketUrl,
       action: 'Sell',
       comment: `Selling ${existingPosition.side} @ ${(currentPrice * 100).toFixed(1)}¢ | ${reasoning.slice(0, 100)}... [${profitPct > 0 ? '+' : ''}${profitPct.toFixed(1)}% P&L]`,
       profit,
@@ -430,6 +441,7 @@ async function executeTrade(
     await storage.createEvent({
       modelId,
       market: market.title,
+      marketUrl: market.marketUrl,
       action: 'Hold',
       comment: `Holding ${existingPosition.side} position. ${reasoning.slice(0, 130)}... [${confidence}% conf]`,
       profit: 0,
@@ -458,40 +470,57 @@ async function processModelTrading(modelId: ModelId, portfolio: ModelPortfolio, 
         }
       }
       
-      // Step 2: Check existing positions for exit signals
+      // Step 2: Collect ALL markets to analyze in a single batch (positions + new opportunities)
+      const positionTickers = Array.from(portfolio.positions.keys());
+      const positionMarkets = markets.filter(m => positionTickers.includes(m.ticker));
+      const newMarkets = markets.filter(m => !portfolio.positions.has(m.ticker)).slice(0, 3);
+      const allMarketsToAnalyze = [...positionMarkets, ...newMarkets];
+      
+      if (allMarketsToAnalyze.length === 0) {
+        console.log(`[Trading] ${modelId} no markets to analyze`);
+        return;
+      }
+      
+      console.log(`[Trading] ${modelId} analyzing ${allMarketsToAnalyze.length} markets in 1 LLM call (${positionMarkets.length} positions, ${newMarkets.length} new)`);
+      
+      // Step 3: Get ALL predictions in ONE LLM call (this is the key optimization!)
+      const predictions = await getBulkLLMPredictions(allMarketsToAnalyze, modelId);
+      
+      if (predictions.size === 0) {
+        console.log(`[Trading] ${modelId} received no predictions`);
+        return;
+      }
+      
+      // Step 4: Check existing positions for exit signals
       for (const [ticker, position] of Array.from(portfolio.positions.entries())) {
         const market = markets.find(m => m.ticker === ticker);
-        if (market) {
+        const prediction = predictions.get(ticker);
+        
+        if (market && prediction) {
           const currentPrice = (position.side === 'YES' ? market.yesPrice : market.noPrice) / 100;
-          const prediction = await getLLMPrediction(market, modelId);
           
-          if (prediction) {
-            // Check if we should close using risk engine
-            const { shouldClose, reason } = RiskEngine.shouldClosePosition(
-              position,
-              currentPrice,
-              prediction.confidence,
-              market.closeTime
-            );
-            
-            if (shouldClose) {
-              console.log(`[Trading] ${modelId} closing ${ticker}: ${reason}`);
-              await executeTrade(modelId, market, 'SELL', position.side, prediction.confidence, reason);
-            }
+          // Check if we should close using risk engine
+          const { shouldClose, reason } = RiskEngine.shouldClosePosition(
+            position,
+            currentPrice,
+            prediction.confidence,
+            market.closeTime
+          );
+          
+          if (shouldClose) {
+            console.log(`[Trading] ${modelId} closing ${ticker}: ${reason}`);
+            await executeTrade(modelId, market, 'SELL', position.side, prediction.confidence, reason);
           }
         }
       }
       
-      // Step 3: Find best market to trade (can have unlimited positions, just max 1 per market)
-      // Only analyze top 2 markets to reduce LLM calls
+      // Step 5: Find best new market to open a position
       let bestMarket = null;
       let bestPrediction = null;
       let bestConfidence = 0;
       
-      const marketsToAnalyze = markets.filter(m => !portfolio.positions.has(m.ticker)).slice(0, 2);
-      
-      for (const market of marketsToAnalyze) {
-        const prediction = await getLLMPrediction(market, modelId);
+      for (const market of newMarkets) {
+        const prediction = predictions.get(market.ticker);
         if (prediction && prediction.confidence > bestConfidence) {
           bestConfidence = prediction.confidence;
           bestMarket = market;

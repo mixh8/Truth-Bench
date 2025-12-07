@@ -102,7 +102,7 @@ app.use((req, res, next) => {
       log('====================================');
       log(`🚀 ${isSimulated ? 'SIMULATED' : 'LIVE'} TRADING SIMULATION STARTED`);
       log('====================================');
-      log(`📊 Trading Cycle: Every ${isSimulated ? '10 seconds' : '10 minutes'}`);
+      log(`📊 Trading Cycle: Every ${isSimulated ? '10 seconds' : '5 minutes'}`);
       log('💰 Portfolio Mark-to-Market: Every 10 seconds');
       log('🤖 Models: 5 (grok_heavy_x, grok_heavy, gpt_5, claude_opus, gemini_pro)');
       log('📈 Initial Capital: $10,000 per model');
@@ -119,8 +119,8 @@ app.use((req, res, next) => {
         runTradingCycle().catch(err => console.error('[Trading] Cycle error:', err));
       }, initialDelay);
       
-      // Run trading cycle - every 10 seconds in simulated mode, every 10 minutes in real mode
-      const tradingInterval = isSimulated ? 10 * 1000 : 10 * 60 * 1000;
+      // Run trading cycle - every 10 seconds in simulated mode, every 5 minutes in real mode
+      const tradingInterval = isSimulated ? 10 * 1000 : 5 * 60 * 1000;
       setInterval(() => {
         log('⏰ Running SCHEDULED trading cycle...');
         runTradingCycle().catch(err => console.error('[Trading] Cycle error:', err));
