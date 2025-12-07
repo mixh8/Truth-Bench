@@ -102,7 +102,7 @@ const MARKETS: Market[] = [
 
 const MODEL_VOTES: Record<string, ModelVote[]> = {
   'pres-winner-28': [
-    { id: 'grok_heavy_x', name: 'Grok 4 Heavy w/ X', vote: 'YES', confidence: 82, reasoning: 'Strong early momentum and party consolidation signals' },
+    { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 82, reasoning: 'Strong early momentum and party consolidation signals' },
     { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 78, reasoning: 'Historical pattern matching favors incumbent party fatigue' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 71, reasoning: 'Economic indicators suggest favorable conditions for challenger' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 68, reasoning: 'Sentiment analysis shows growing support trajectory' },
@@ -110,7 +110,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
     { id: 'deepseek_v3', name: 'DeepSeek-V3.2', vote: 'YES', confidence: 74, reasoning: 'Identifies arbitrage opportunity in undervalued YES contracts' },
   ],
   'fed-nominee': [
-    { id: 'grok_heavy_x', name: 'Grok 4 Heavy w/ X', vote: 'YES', confidence: 88, reasoning: 'X posts strongly indicate Hassett as frontrunner' },
+    { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 88, reasoning: 'X posts strongly indicate Hassett as frontrunner' },
     { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 85, reasoning: 'Political alignment analysis supports this pick' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 79, reasoning: 'Historical nomination patterns match this profile' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 76, reasoning: 'Media coverage analysis suggests strong candidacy' },
@@ -118,7 +118,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
     { id: 'deepseek_v3', name: 'DeepSeek-V3.2', vote: 'YES', confidence: 81, reasoning: 'Market pricing reflects high probability correctly' },
   ],
   'dem-nom-28': [
-    { id: 'grok_heavy_x', name: 'Grok 4 Heavy w/ X', vote: 'YES', confidence: 65, reasoning: 'Social media momentum building for Newsom' },
+    { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 65, reasoning: 'Social media momentum building for Newsom' },
     { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'NO', confidence: 58, reasoning: 'Field is too crowded for certainty' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 62, reasoning: 'Fundraising capacity gives significant advantage' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'NO', confidence: 55, reasoning: 'Primary dynamics historically unpredictable' },
@@ -126,7 +126,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
     { id: 'deepseek_v3', name: 'DeepSeek-V3.2', vote: 'YES', confidence: 59, reasoning: 'Current odds undervalue established candidates' },
   ],
   'cabinet-exit': [
-    { id: 'grok_heavy_x', name: 'Grok 4 Heavy w/ X', vote: 'YES', confidence: 72, reasoning: 'Media scrutiny patterns suggest vulnerability' },
+    { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 72, reasoning: 'Media scrutiny patterns suggest vulnerability' },
     { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 68, reasoning: 'Historical cabinet turnover analysis supports this' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'NO', confidence: 55, reasoning: 'Multiple candidates have similar risk profiles' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 64, reasoning: 'Controversy timeline suggests early departure' },
@@ -134,7 +134,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
     { id: 'deepseek_v3', name: 'DeepSeek-V3.2', vote: 'YES', confidence: 66, reasoning: 'Betting market inefficiency detected' },
   ],
   'house-2026': [
-    { id: 'grok_heavy_x', name: 'Grok 4 Heavy w/ X', vote: 'YES', confidence: 81, reasoning: 'Midterm historical patterns favor opposition party' },
+    { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'YES', confidence: 81, reasoning: 'Midterm historical patterns favor opposition party' },
     { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'YES', confidence: 78, reasoning: 'Redistricting analysis favors Democrats' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'YES', confidence: 75, reasoning: 'Economic cycle positioning supports flip' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 72, reasoning: 'Polling trajectory analysis is favorable' },
@@ -142,7 +142,7 @@ const MODEL_VOTES: Record<string, ModelVote[]> = {
     { id: 'deepseek_v3', name: 'DeepSeek-V3.2', vote: 'YES', confidence: 77, reasoning: 'Market is correctly pricing high probability' },
   ],
   'world-leader-exit': [
-    { id: 'grok_heavy_x', name: 'Grok 4 Heavy w/ X', vote: 'NO', confidence: 75, reasoning: 'Authoritarian regimes show remarkable stability' },
+    { id: 'grok_heavy_x', name: 'Grok w/ X', vote: 'NO', confidence: 75, reasoning: 'Authoritarian regimes show remarkable stability' },
     { id: 'grok_heavy', name: 'Grok 4 Heavy', vote: 'NO', confidence: 72, reasoning: 'Opposition lacks coordination for ouster' },
     { id: 'gpt_5', name: 'GPT-5.1', vote: 'NO', confidence: 68, reasoning: 'Historical analysis of similar regimes' },
     { id: 'gemini_pro', name: 'Gemini 3 Pro', vote: 'YES', confidence: 45, reasoning: 'Some external pressure indicators rising' },

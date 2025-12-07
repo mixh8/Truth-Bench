@@ -45,7 +45,7 @@ function calculateTruthScore(totalReturn: number, maxDrawdown: number, sharpeRat
 const HARDCODED_MODELS: ModelMetrics[] = [
   {
     id: 'grok_heavy_x',
-    name: 'Grok 4 Heavy w/ X',
+    name: 'Grok w/ X',
     totalReturn: 19.54,
     winRate: 35.0,
     sharpeRatio: 1.35,
