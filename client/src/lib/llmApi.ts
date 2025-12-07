@@ -6,11 +6,12 @@
  */
 
 // Allow overriding the backend; trim trailing slashes to avoid // in URLs.
-// In production with no override, fall back to relative paths so Vercel rewrites
-// can proxy to the Render backend without CORS.
+// In production, use the deployed Render Python service.
 const rawServiceUrl =
   import.meta.env.VITE_LLM_SERVICE_URL ??
-  (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8000');
+  (import.meta.env.MODE === 'production' 
+    ? 'https://truth-bench-python.onrender.com' 
+    : 'http://localhost:8000');
 
 const LLM_SERVICE_URL = rawServiceUrl.replace(/\/+$/, '');
 

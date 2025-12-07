@@ -5,7 +5,14 @@
  * the TruthBench simulation backend.
  */
 
-const LLM_SERVICE_URL = 'http://localhost:8000';
+// Use environment variable or default to Render deployment in production
+const rawServiceUrl =
+  import.meta.env.VITE_LLM_SERVICE_URL ??
+  (import.meta.env.MODE === 'production' 
+    ? 'https://truth-bench-python.onrender.com' 
+    : 'http://localhost:8000');
+
+const LLM_SERVICE_URL = rawServiceUrl.replace(/\/+$/, '');
 
 // ============================================================================
 // Types
