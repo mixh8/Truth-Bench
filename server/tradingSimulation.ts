@@ -68,23 +68,35 @@ export const MODELS_CONFIG: Record<ModelId, {
   }
 };
 
+const parseHistory = (history: any): { time: number; value: number }[] => {
+  if (typeof history === 'string') {
+    try {
+      return JSON.parse(history);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(history) ? history : [];
+};
+
 /**
  * Initialize portfolios for all models
  */
 export async function initializePortfolios() {
   const modelIds: ModelId[] = ['grok_heavy_x', 'grok_heavy', 'gemini_pro', 'claude_opus', 'gpt_5'];
   
-  // Ensure models exist in database
   for (const modelId of modelIds) {
-    const existing = await storage.getModel(modelId);
-    if (!existing) {
-      const config = MODELS_CONFIG[modelId];
+    const config = MODELS_CONFIG[modelId];
+    let model = await storage.getModel(modelId);
+
+    // Seed the DB if the model does not exist
+    if (!model) {
       const startTime = Date.now() - 1000 * 60 * 60 * 24;
-      const history = Array.from({ length: 24 }, (_, i) => ({
+      const seedHistory = Array.from({ length: 24 }, (_, i) => ({
         time: startTime + i * 1000 * 60 * 60,
         value: INITIAL_CAPITAL
       }));
-      
+
       await storage.createOrUpdateModel({
         id: modelId,
         name: config.name,
@@ -93,33 +105,38 @@ export async function initializePortfolios() {
         currentValue: INITIAL_CAPITAL,
         riskFactor: config.riskFactor,
         description: config.description,
-        history: JSON.stringify(history),
+        history: JSON.stringify(seedHistory),
       });
-      
+
       console.log(`[Trading] Created model ${modelId} in database`);
+      model = await storage.getModel(modelId);
     }
+
+    const parsedHistory = parseHistory(model?.history);
+    const currentValue = model?.currentValue ?? INITIAL_CAPITAL;
+    const history = parsedHistory.length
+      ? parsedHistory
+      : (() => {
+          const startTime = Date.now() - 1000 * 60 * 60 * 24;
+          return Array.from({ length: 24 }, (_, i) => ({
+            time: startTime + i * 1000 * 60 * 60,
+            value: currentValue
+          }));
+        })();
+    const peakValue = history.reduce((max, point) => Math.max(max, point.value), currentValue);
+
+    modelPortfolios.set(modelId, {
+      modelId,
+      cash: currentValue,
+      positions: new Map(),
+      totalValue: currentValue,
+      peakValue,
+      tradesThisSession: 0,
+      history,
+    });
   }
   
-  // Initialize in-memory portfolios
-  for (const modelId of modelIds) {
-    if (!modelPortfolios.has(modelId)) {
-      const startTime = Date.now() - 1000 * 60 * 60 * 24; // 24 hours ago
-      modelPortfolios.set(modelId, {
-        modelId,
-        cash: INITIAL_CAPITAL,
-        positions: new Map(),
-        totalValue: INITIAL_CAPITAL,
-        peakValue: INITIAL_CAPITAL,
-        tradesThisSession: 0,
-        history: Array.from({ length: 24 }, (_, i) => ({
-          time: startTime + i * 1000 * 60 * 60,
-          value: INITIAL_CAPITAL
-        }))
-      });
-    }
-  }
-  
-  console.log('[Trading] Portfolios initialized for all models');
+  console.log('[Trading] Portfolios initialized for all models (hydrated from DB)');
 }
 
 /**
