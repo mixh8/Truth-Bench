@@ -55,44 +55,59 @@ function generateRandomProbability(): number {
   return Math.floor(Math.random() * 99) + 1;
 }
 
-export async function seedTrades(): Promise<void> {
-  try {
-    console.log("Checking for existing seeded trades...");
-    
-    const existing = await db.select().from(marketEvents).limit(1);
-    if (existing.length > 0) {
-      console.log("Trades already exist. Skipping seed.");
-      return;
-    }
-
-    console.log("Seeding 100 trades...");
-    
-    const trades = [];
-    const baseTime = Date.now() - 100 * 60 * 1000;
-    
-    for (let i = 0; i < 100; i++) {
-      const isBullish = Math.random() > 0.45;
-      const modelId = getRandomElement(MODELS);
-      const market = getRandomElement(MARKETS);
-      const action = isBullish ? 'Buy' : 'Sell';
-      const comment = isBullish 
-        ? getRandomElement(BULLISH_COMMENTS)
-        : getRandomElement(BEARISH_COMMENTS);
-      
-      trades.push({
-        modelId,
-        market,
-        action,
-        comment,
-        timestamp: new Date(baseTime + i * 60 * 1000),
-      });
-    }
-
-    await db.insert(marketEvents).values(trades);
-    console.log("Successfully seeded 100 trades!");
-  } catch (error) {
-    console.error("Database error during seed:", error instanceof Error ? error.message : error);
-    throw error;
-  }
+async function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+export async function seedTrades(retries = 5): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`[Seed] Attempt ${attempt}/${retries}: Checking for existing trades...`);
+      
+      const existing = await db.select().from(marketEvents).limit(1);
+      if (existing.length > 0) {
+        console.log("[Seed] Trades already exist. Skipping seed.");
+        return;
+      }
+
+      console.log("[Seed] Seeding 100 trades...");
+      
+      const trades = [];
+      const baseTime = Date.now() - 100 * 60 * 1000;
+      
+      for (let i = 0; i < 100; i++) {
+        const isBullish = Math.random() > 0.45;
+        const modelId = getRandomElement(MODELS);
+        const market = getRandomElement(MARKETS);
+        const action = isBullish ? 'Buy' : 'Sell';
+        const comment = isBullish 
+          ? getRandomElement(BULLISH_COMMENTS)
+          : getRandomElement(BEARISH_COMMENTS);
+        
+        trades.push({
+          modelId,
+          market,
+          action,
+          comment,
+          timestamp: new Date(baseTime + i * 60 * 1000),
+        });
+      }
+
+      await db.insert(marketEvents).values(trades);
+      console.log("[Seed] Successfully seeded 100 trades!");
+      return;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[Seed] Attempt ${attempt} failed:`, errorMessage);
+      
+      if (attempt < retries) {
+        const waitTime = attempt * 2000;
+        console.log(`[Seed] Waiting ${waitTime}ms before retry...`);
+        await delay(waitTime);
+      } else {
+        console.error("[Seed] All retry attempts exhausted. Trades not seeded.");
+        throw error;
+      }
+    }
+  }
+}
