@@ -65,14 +65,37 @@ const CustomizedDot = (props: any) => {
   if (index !== dataLength - 1) return null;
 
   return (
-    <foreignObject x={cx + 5} y={cy - 10} width={30} height={30}>
-      <div 
-        className="w-6 h-6 rounded-full flex items-center justify-center shadow-md bg-background border-2"
-        style={{ borderColor: stroke }}
-      >
-        <ModelIcon id={modelId} className="w-3 h-3 text-foreground" />
-      </div>
-    </foreignObject>
+    <g>
+      <circle
+        cx={cx}
+        cy={cy}
+        r={14}
+        stroke={stroke}
+        fill="none"
+        strokeWidth={2}
+        className="ripple-circle animate-[ripple-svg_2s_ease-out_infinite]"
+        opacity={0.4}
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={14}
+        stroke={stroke}
+        fill="none"
+        strokeWidth={2}
+        className="ripple-circle animate-[ripple-svg_2s_ease-out_infinite]"
+        opacity={0.25}
+        style={{ animationDelay: "0.6s" }}
+      />
+      <foreignObject x={cx - 14} y={cy - 14} width={28} height={28}>
+        <div 
+          className="w-full h-full rounded-full flex items-center justify-center shadow-md bg-background border-2 animate-[pulse_2s_ease-in-out_infinite]"
+          style={{ borderColor: stroke }}
+        >
+          <ModelIcon id={modelId} className="w-4 h-4 text-foreground" />
+        </div>
+      </foreignObject>
+    </g>
   );
 };
 
