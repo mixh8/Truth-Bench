@@ -127,6 +127,7 @@ export function useSimulation() {
   });
 
   const [events, setEvents] = useState<MarketEvent[]>([]);
+  const [totalVolume, setTotalVolume] = useState(1200000); // Start at $1.2M
   const [isPlaying, setIsPlaying] = useState(true);
   const timeRef = useRef(Date.now());
 
@@ -173,6 +174,9 @@ export function useSimulation() {
         const type = isBullish ? 'bullish' : 'bearish';
         const action = isBullish ? 'Buy' : 'Sell';
         const comment = COMMENTS[type][Math.floor(Math.random() * COMMENTS[type].length)];
+        const tradeAmount = Math.floor(Math.random() * 45000) + 5000; // $5k - $50k per trade
+
+        setTotalVolume(prev => prev + tradeAmount);
 
         const newEvent: MarketEvent = {
           id: Math.random().toString(36).substr(2, 9),
@@ -191,5 +195,5 @@ export function useSimulation() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  return { models, events, isPlaying, setIsPlaying };
+  return { models, events, totalVolume, isPlaying, setIsPlaying };
 }

@@ -9,7 +9,7 @@ import { Play, Pause, RefreshCw } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 
 export default function Dashboard() {
-  const { models, events, isPlaying, setIsPlaying } = useSimulation();
+  const { models, events, totalVolume, isPlaying, setIsPlaying } = useSimulation();
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -55,7 +55,9 @@ export default function Dashboard() {
                      {/* Stats Cards could go here */}
                      <div className="bg-card border border-border rounded-lg p-4">
                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Total Volume</h4>
-                         <span className="text-2xl font-mono font-bold">$1.2M</span>
+                         <span className="text-2xl font-mono font-bold">
+                            ${(totalVolume / 1000000).toFixed(2)}M
+                         </span>
                      </div>
                      <div className="bg-card border border-border rounded-lg p-4">
                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Active Models</h4>
