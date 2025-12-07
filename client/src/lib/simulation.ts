@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5' | 'deepseek_v3';
 
@@ -8,9 +9,11 @@ export interface Model {
   color: string;
   avatar: string;
   currentValue: number;
-  history: { time: number; value: number }[];
+  history: { time: number; value: number }[] | string;
   riskFactor: number;
   description: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface MarketEvent {
@@ -19,7 +22,7 @@ export interface MarketEvent {
   market: string;
   action: 'Buy' | 'Sell' | 'Hold';
   comment: string;
-  timestamp: number;
+  timestamp: number | Date;
   profit?: number;
 }
 
@@ -113,23 +116,146 @@ const COMMENTS = {
   ]
 };
 
-export function useSimulation() {
-  const [models, setModels] = useState<Model[]>(() => {
-    const startTime = Date.now() - 1000 * 60 * 60 * 24; // Start 24 hours ago
-    return Object.values(MODELS_CONFIG).map(config => ({
-      ...config,
-      currentValue: INITIAL_CAPITAL,
-      history: Array.from({ length: 24 }, (_, i) => ({
-        time: startTime + i * 1000 * 60 * 60,
-        value: INITIAL_CAPITAL
-      }))
-    }));
-  });
+const parseHistory = (history: any): { time: number; value: number }[] => {
+  if (typeof history === 'string') {
+    try {
+      return JSON.parse(history);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(history) ? history : [];
+};
 
-  const [events, setEvents] = useState<MarketEvent[]>([]);
-  const [totalVolume, setTotalVolume] = useState(1200000); // Start at $1.2M
+export function useSimulation() {
+  const queryClient = useQueryClient();
+  const [localModels, setLocalModels] = useState<Model[]>([]);
+  const [localEvents, setLocalEvents] = useState<MarketEvent[]>([]);
+  const [localTotalVolume, setLocalTotalVolume] = useState(1200000);
   const [isPlaying, setIsPlaying] = useState(true);
   const timeRef = useRef(Date.now());
+  const initializeModelsOnce = useRef(false);
+
+  // Mutations - must be created unconditionally at hook level
+  const updateModelMutation = useMutation({
+    mutationFn: (model: Model) =>
+      fetch(`/api/models/${model.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(model)
+      }).then(r => r.json()),
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: (event: Omit<MarketEvent, 'id' | 'timestamp'> & { timestamp?: number }) =>
+      fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event)
+      }).then(r => r.json()),
+    onSuccess: (newEvent) => {
+      setLocalEvents(prev => [newEvent, ...prev].slice(0, 20));
+      queryClient.setQueryData(['events'], (old: MarketEvent[]) => [newEvent, ...old].slice(0, 20));
+    }
+  });
+
+  const updateStateMutation = useMutation({
+    mutationFn: (state: { totalVolume?: number; isPlaying?: number }) =>
+      fetch('/api/market-state', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state)
+      }).then(r => r.json()),
+  });
+
+  // Fetch initial data
+  const { data: apiModels } = useQuery({
+    queryKey: ['models'],
+    queryFn: async () => {
+      const res = await fetch('/api/models');
+      if (!res.ok) throw new Error('Failed to fetch models');
+      return res.json() as Promise<Model[]>;
+    },
+    staleTime: 5000,
+  });
+
+  const { data: apiEvents } = useQuery({
+    queryKey: ['events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events?limit=20');
+      if (!res.ok) throw new Error('Failed to fetch events');
+      return res.json() as Promise<MarketEvent[]>;
+    },
+    staleTime: 5000,
+  });
+
+  const { data: marketState } = useQuery({
+    queryKey: ['marketState'],
+    queryFn: async () => {
+      const res = await fetch('/api/market-state');
+      if (!res.ok) throw new Error('Failed to fetch market state');
+      return res.json();
+    },
+    staleTime: 5000,
+  });
+
+  // Initialize models in database if needed
+  useEffect(() => {
+    if (!initializeModelsOnce.current && !apiModels) {
+      initializeModelsOnce.current = true;
+      const startTime = Date.now() - 1000 * 60 * 60 * 24;
+      Object.entries(MODELS_CONFIG).forEach(([modelId, config]) => {
+        const history = Array.from({ length: 24 }, (_, i) => ({
+          time: startTime + i * 1000 * 60 * 60,
+          value: INITIAL_CAPITAL
+        }));
+        const { id, ...configWithoutId } = config;
+        fetch('/api/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: modelId,
+            ...configWithoutId,
+            currentValue: INITIAL_CAPITAL,
+            history,
+          })
+        }).catch(() => {});
+      });
+    }
+  }, [apiModels]);
+
+  // Set local state when API data loads
+  useEffect(() => {
+    if (apiModels?.length) {
+      const models = apiModels.map(m => ({
+        ...m,
+        history: parseHistory(m.history)
+      }));
+      setLocalModels(models);
+    } else {
+      const startTime = Date.now() - 1000 * 60 * 60 * 24;
+      setLocalModels(Object.values(MODELS_CONFIG).map(config => ({
+        ...config,
+        currentValue: INITIAL_CAPITAL,
+        history: Array.from({ length: 24 }, (_, i) => ({
+          time: startTime + i * 1000 * 60 * 60,
+          value: INITIAL_CAPITAL
+        }))
+      })));
+    }
+  }, [apiModels]);
+
+  useEffect(() => {
+    if (apiEvents?.length) {
+      setLocalEvents(apiEvents);
+    }
+  }, [apiEvents]);
+
+  useEffect(() => {
+    if (marketState?.totalVolume) {
+      setLocalTotalVolume(marketState.totalVolume);
+    }
+  }, [marketState]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -138,33 +264,34 @@ export function useSimulation() {
       const now = Date.now();
       timeRef.current = now;
 
-      setModels(prevModels => {
-        return prevModels.map(model => {
+      setLocalModels(prevModels => {
+        const updated = prevModels.map(model => {
           let trend = 0;
           let volatility = model.riskFactor * 50;
           
-          // Bias logic: 
-          // Grok 4 Heavy with X: Win by 2-7%
-          // Grok 4 Heavy: 2nd place
-          
           if (model.id === 'grok_heavy_x') {
-             trend = 4 + Math.random() * 4; // Controlled upward drift
+             trend = 4 + Math.random() * 4;
              volatility *= 1.1; 
           } else if (model.id === 'grok_heavy') {
-             trend = 2 + Math.random() * 3; // Slightly less drift
+             trend = 2 + Math.random() * 3;
           } else {
-             trend = (Math.random() - 0.48) * 8; // Flat/Slightly positive for others
+             trend = (Math.random() - 0.48) * 8;
           }
 
           const change = trend + (Math.random() - 0.5) * volatility * 3;
           const newValue = model.currentValue + change;
+          const history = parseHistory(model.history);
 
-          return {
+          const newModel = {
             ...model,
             currentValue: newValue,
-            history: [...model.history, { time: now, value: newValue }].slice(-100)
+            history: [...history, { time: now, value: newValue }].slice(-100)
           };
+
+          updateModelMutation.mutate(newModel);
+          return newModel;
         });
+        return updated;
       });
 
       if (Math.random() > 0.6) {
@@ -174,26 +301,27 @@ export function useSimulation() {
         const type = isBullish ? 'bullish' : 'bearish';
         const action = isBullish ? 'Buy' : 'Sell';
         const comment = COMMENTS[type][Math.floor(Math.random() * COMMENTS[type].length)];
-        const tradeAmount = Math.floor(Math.random() * 45000) + 5000; // $5k - $50k per trade
+        const tradeAmount = Math.floor(Math.random() * 45000) + 5000;
 
-        setTotalVolume(prev => prev + tradeAmount);
+        setLocalTotalVolume(prev => {
+          const newVolume = prev + tradeAmount;
+          updateStateMutation.mutate({ totalVolume: newVolume });
+          return newVolume;
+        });
 
-        const newEvent: MarketEvent = {
-          id: Math.random().toString(36).substr(2, 9),
+        createEventMutation.mutate({
           modelId: randomModel.id as ModelId,
           market,
           action,
           comment,
           timestamp: now
-        };
-
-        setEvents(prev => [newEvent, ...prev].slice(0, 20));
+        });
       }
 
-    }, 1000); // Faster updates: 1 second
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, updateModelMutation, createEventMutation, updateStateMutation]);
 
-  return { models, events, totalVolume, isPlaying, setIsPlaying };
+  return { models: localModels, events: localEvents, totalVolume: localTotalVolume, isPlaying, setIsPlaying };
 }
