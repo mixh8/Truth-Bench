@@ -58,6 +58,7 @@ AVAILABLE_MODELS: list[ModelInfo] = [
         name="Grok 4.1 Fast (Reasoning)",
         supports_tools=True,
         supports_web_search=True,
+        supports_x_search=True,
         supports_vision=True,
     ),
     # ==========================================================================

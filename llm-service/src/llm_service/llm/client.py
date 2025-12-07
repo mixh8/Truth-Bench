@@ -4,11 +4,13 @@ LLM Client wrapper using LiteLLM for multi-provider support.
 This module provides:
 - Unified interface for multiple LLM providers
 - Web search support (xAI, OpenAI, Anthropic)
+- X search support (xAI models only via native SDK)
 - Tool/function calling
 - Streaming support
 - Comprehensive logging
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -18,6 +20,12 @@ from typing import Any
 
 import litellm
 from litellm import acompletion, completion
+
+# xAI SDK for native X search support
+from xai_sdk import Client as XaiClient
+from xai_sdk.chat import system as xai_system
+from xai_sdk.chat import user as xai_user
+from xai_sdk.tools import x_search as xai_x_search
 
 from llm_service.config import Settings, get_logger
 from llm_service.llm.providers import get_model_info, get_provider_for_model
@@ -277,9 +285,168 @@ class LLMClient:
             finish_reason=choice.finish_reason,
         )
 
+    def _should_use_xai_sdk(self, request: ChatRequest) -> bool:
+        """
+        Determine if we should use xAI SDK instead of LiteLLM.
+
+        Uses xAI SDK when:
+        - x_search is enabled AND
+        - Model is an xAI model (grok-*)
+
+        Args:
+            request: Chat request
+
+        Returns:
+            True if should use xAI SDK
+        """
+        if not request.x_search:
+            return False
+
+        provider = get_provider_for_model(request.model)
+        return provider == "xai"
+
+    def _get_xai_model_name(self, model: str) -> str:
+        """
+        Extract xAI model name from model identifier.
+
+        Args:
+            model: Model identifier (e.g., xai/grok-4-1-fast-reasoning)
+
+        Returns:
+            Model name for xAI SDK (e.g., grok-4-1-fast-reasoning)
+        """
+        if model.lower().startswith("xai/"):
+            return model[4:]  # Remove "xai/" prefix
+        return model
+
+    async def _xai_completion_with_x_search(
+        self, request: ChatRequest
+    ) -> ChatResponse:
+        """
+        Perform chat completion using xAI SDK with native X search.
+
+        This method uses the xAI SDK directly instead of LiteLLM to enable
+        native X search capabilities that are only available through the SDK.
+
+        Args:
+            request: Chat completion request with x_search enabled
+
+        Returns:
+            ChatResponse with the model's response
+
+        Raises:
+            Exception: If the completion fails
+        """
+        self.logger.info(
+            "Starting xAI SDK completion with X search",
+            extra={
+                "model": request.model,
+                "message_count": len(request.messages),
+                "x_search_options": request.x_search_options.model_dump()
+                if request.x_search_options
+                else None,
+            },
+        )
+
+        # Initialize xAI async client
+        xai_client = XaiClient(api_key=self.settings.xai_api_key)
+
+        # Build X search tool configuration
+        x_search_kwargs: dict[str, Any] = {}
+        if request.x_search_options:
+            if request.x_search_options.allowed_x_handles:
+                x_search_kwargs["allowed_x_handles"] = (
+                    request.x_search_options.allowed_x_handles
+                )
+            x_search_kwargs["enable_image_understanding"] = (
+                request.x_search_options.enable_image_understanding
+            )
+            x_search_kwargs["enable_video_understanding"] = (
+                request.x_search_options.enable_video_understanding
+            )
+        else:
+            # Default options
+            x_search_kwargs["enable_image_understanding"] = True
+            x_search_kwargs["enable_video_understanding"] = True
+
+        self.logger.debug(
+            "X search tool configuration",
+            extra={"x_search_kwargs": x_search_kwargs},
+        )
+
+        # Get model name for xAI SDK
+        xai_model = self._get_xai_model_name(request.model)
+
+        # Create chat with X search tool
+        chat = xai_client.chat.create(
+            model=xai_model,
+            tools=[xai_x_search(**x_search_kwargs)],
+        )
+
+        # Append messages
+        for msg in request.messages:
+            if msg.role == "system":
+                chat.append(xai_system(msg.content))
+            elif msg.role == "user":
+                chat.append(xai_user(msg.content))
+            elif msg.role == "assistant" and msg.content:
+                # For assistant messages, we need to handle differently
+                # The xAI SDK expects response objects, not raw assistant messages
+                # For simplicity in multi-turn, skip assistant messages
+                pass
+
+        # Sample response (xAI SDK uses sync sample(), run in thread for async)
+        response = await asyncio.to_thread(chat.sample)
+
+        self.logger.debug(
+            "xAI SDK response received",
+            extra={
+                "has_content": bool(response.content),
+                "has_citations": bool(getattr(response, "citations", None)),
+            },
+        )
+
+        # Build response message
+        response_message = ResponseMessage(
+            role="assistant",
+            content=response.content or "",
+            tool_calls=None,  # X search is server-side, no tool_calls exposed
+        )
+
+        # Parse usage if available
+        usage = None
+        if hasattr(response, "usage") and response.usage:
+            usage = Usage(
+                prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                total_tokens=getattr(response.usage, "total_tokens", 0),
+            )
+
+        # Generate response ID
+        response_id = getattr(response, "id", None) or f"xai-{uuid.uuid4().hex[:8]}"
+
+        self.logger.info(
+            "xAI SDK completion with X search successful",
+            extra={
+                "model": request.model,
+                "response_length": len(response.content) if response.content else 0,
+            },
+        )
+
+        return ChatResponse(
+            id=response_id,
+            model=request.model,
+            message=response_message,
+            usage=usage,
+            finish_reason="stop",
+        )
+
     def chat_completion(self, request: ChatRequest) -> ChatResponse:
         """
         Perform a synchronous chat completion.
+
+        Note: X search requires async and will raise an error if used synchronously.
+        Use achat_completion() for X search support.
 
         Args:
             request: Chat completion request
@@ -288,8 +455,15 @@ class LLMClient:
             ChatResponse with the model's response
 
         Raises:
+            ValueError: If x_search is enabled (requires async)
             Exception: If the completion fails
         """
+        # X search requires async due to xAI SDK
+        if self._should_use_xai_sdk(request):
+            raise ValueError(
+                "X search requires async. Use achat_completion() instead."
+            )
+
         self.logger.info(
             "Starting chat completion",
             extra={
@@ -331,6 +505,9 @@ class LLMClient:
         """
         Perform an asynchronous chat completion.
 
+        Routes to xAI SDK when X search is enabled for xAI models,
+        otherwise uses LiteLLM.
+
         Args:
             request: Chat completion request
 
@@ -340,11 +517,21 @@ class LLMClient:
         Raises:
             Exception: If the completion fails
         """
+        # Route to xAI SDK for native X search support
+        if self._should_use_xai_sdk(request):
+            self.logger.info(
+                "Routing to xAI SDK for X search",
+                extra={"model": request.model},
+            )
+            return await self._xai_completion_with_x_search(request)
+
+        # Default: use LiteLLM
         self.logger.info(
-            "Starting async chat completion",
+            "Starting async chat completion via LiteLLM",
             extra={
                 "model": request.model,
                 "message_count": len(request.messages),
+                "web_search": request.web_search,
             },
         )
 

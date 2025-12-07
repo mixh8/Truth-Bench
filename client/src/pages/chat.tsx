@@ -40,6 +40,7 @@ import {
   Globe,
   Cpu,
   Zap,
+  Twitter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -69,6 +70,7 @@ export default function Chat() {
   // State
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [xSearchEnabled, setXSearchEnabled] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +108,7 @@ export default function Chat() {
     sendMessage(inputValue.trim(), {
       model: selectedModel,
       webSearch: webSearchEnabled && currentModel?.supports_web_search,
+      xSearch: xSearchEnabled && currentModel?.supports_x_search,
     });
 
     setInputValue('');
@@ -235,6 +238,26 @@ export default function Chat() {
               />
             </div>
 
+            {/* X Search Toggle - Only show for xAI models */}
+            {currentModel?.supports_x_search && (
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Twitter className="w-4 h-4 text-muted-foreground" />
+                  <Label
+                    htmlFor="x-search"
+                    className="text-sm cursor-pointer"
+                  >
+                    X Search
+                  </Label>
+                </div>
+                <Switch
+                  id="x-search"
+                  checked={xSearchEnabled}
+                  onCheckedChange={setXSearchEnabled}
+                />
+              </div>
+            )}
+
             {/* Clear Chat */}
             <Button
               variant="outline"
@@ -268,6 +291,12 @@ export default function Chat() {
                 <span className="flex items-center gap-1">
                   <Globe className="w-3 h-3" />
                   Web Search
+                </span>
+              )}
+              {currentModel.supports_x_search && (
+                <span className="flex items-center gap-1">
+                  <Twitter className="w-3 h-3" />
+                  X Search
                 </span>
               )}
               {currentModel.supports_vision && (

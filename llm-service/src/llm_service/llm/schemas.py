@@ -53,6 +53,23 @@ class WebSearchOptions(BaseModel):
     )
 
 
+class XSearchOptions(BaseModel):
+    """Options for X (Twitter) search functionality (xAI models only)."""
+
+    allowed_x_handles: list[str] | None = Field(
+        default=None,
+        description="List of X handles to restrict search to (without @ prefix)",
+    )
+    enable_image_understanding: bool = Field(
+        default=True,
+        description="Enable image understanding in X posts",
+    )
+    enable_video_understanding: bool = Field(
+        default=True,
+        description="Enable video understanding in X posts",
+    )
+
+
 class ChatRequest(BaseModel):
     """Request body for chat completion endpoint."""
 
@@ -74,6 +91,12 @@ class ChatRequest(BaseModel):
     )
     web_search_options: WebSearchOptions | None = Field(
         default=None, description="Web search configuration options"
+    )
+    x_search: bool = Field(
+        default=False, description="Enable X (Twitter) search (xAI models only)"
+    )
+    x_search_options: XSearchOptions | None = Field(
+        default=None, description="X search configuration options"
     )
     stream: bool = Field(default=False, description="Enable streaming response")
     temperature: float | None = Field(
@@ -135,6 +158,7 @@ class ModelInfo(BaseModel):
     name: str = Field(description="Human-readable model name")
     supports_tools: bool = Field(default=True, description="Whether model supports tool calling")
     supports_web_search: bool = Field(default=False, description="Whether model supports web search")
+    supports_x_search: bool = Field(default=False, description="Whether model supports X search (xAI only)")
     supports_vision: bool = Field(default=False, description="Whether model supports vision")
 
 

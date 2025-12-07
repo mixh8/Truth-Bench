@@ -14,6 +14,7 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
     "uvicorn[standard]>=0.38.0",
+    "xai-sdk>=0.1.0",
 ]
 
 [project.scripts]
@@ -25,3 +26,5 @@ build-backend = "uv_build"
 
 [tool.uv]
 package = true
+# Override grpcio version to resolve conflict between litellm and xai-sdk
+override-dependencies = ["grpcio>=1.72.1"]

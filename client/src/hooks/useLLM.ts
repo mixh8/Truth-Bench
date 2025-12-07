@@ -70,6 +70,8 @@ export function useLLMHealth() {
 export interface ChatOptions {
   model: string;
   webSearch?: boolean;
+  /** Enable X (Twitter) search (xAI models only) */
+  xSearch?: boolean;
   temperature?: number;
   maxTokens?: number;
 }
@@ -127,6 +129,7 @@ export function useChat() {
         model: options.model,
         messages: updatedMessages,
         web_search: options.webSearch,
+        x_search: options.xSearch,
         temperature: options.temperature,
         max_tokens: options.maxTokens,
       };

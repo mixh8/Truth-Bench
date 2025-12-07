@@ -35,6 +35,15 @@ export interface WebSearchOptions {
   search_context_size: 'low' | 'medium' | 'high';
 }
 
+export interface XSearchOptions {
+  /** List of X handles to restrict search to (without @ prefix) */
+  allowed_x_handles?: string[];
+  /** Enable image understanding in X posts (default: true) */
+  enable_image_understanding?: boolean;
+  /** Enable video understanding in X posts (default: true) */
+  enable_video_understanding?: boolean;
+}
+
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
@@ -42,6 +51,10 @@ export interface ChatRequest {
   tool_choice?: 'auto' | 'none' | 'required' | string;
   web_search?: boolean;
   web_search_options?: WebSearchOptions;
+  /** Enable X (Twitter) search (xAI models only) */
+  x_search?: boolean;
+  /** X search configuration options */
+  x_search_options?: XSearchOptions;
   stream?: boolean;
   temperature?: number;
   max_tokens?: number;
@@ -83,6 +96,8 @@ export interface ModelInfo {
   name: string;
   supports_tools: boolean;
   supports_web_search: boolean;
+  /** Whether model supports X search (xAI models only) */
+  supports_x_search: boolean;
   supports_vision: boolean;
 }
 
