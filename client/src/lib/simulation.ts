@@ -138,11 +138,11 @@ export function useSimulation() {
 
   // Mutations - must be created unconditionally at hook level
   const updateModelMutation = useMutation({
-    mutationFn: (model: Model) =>
-      fetch(`/api/models/${model.id}`, {
+    mutationFn: (payload: { id: string; currentValue: number; history: { time: number; value: number }[] }) =>
+      fetch(`/api/models/${payload.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(model)
+        body: JSON.stringify({ currentValue: payload.currentValue, history: payload.history })
       }).then(r => r.json()),
   });
 
@@ -282,13 +282,18 @@ export function useSimulation() {
           const newValue = model.currentValue + change;
           const history = parseHistory(model.history);
 
+          const newHistory = [...history, { time: now, value: newValue }].slice(-50);
           const newModel = {
             ...model,
             currentValue: newValue,
-            history: [...history, { time: now, value: newValue }].slice(-100)
+            history: newHistory
           };
 
-          updateModelMutation.mutate(newModel);
+          updateModelMutation.mutate({
+            id: model.id,
+            currentValue: newValue,
+            history: newHistory
+          });
           return newModel;
         });
         return updated;
