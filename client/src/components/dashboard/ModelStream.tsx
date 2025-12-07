@@ -1,4 +1,4 @@
-import { MarketEvent, MODELS_CONFIG } from "@/lib/simulation";
+import { MarketEvent, MODELS_CONFIG, ModelId } from "@/lib/simulation";
 import { cn } from "@/lib/utils";
 import { MessageSquare, Clock } from "lucide-react";
 import { format } from "date-fns";
@@ -33,7 +33,7 @@ export function ModelStream({ events }: ModelStreamProps) {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <AnimatePresence initial={false}>
-          {events.map((event) => {
+          {events.filter(event => MODELS_CONFIG[event.modelId as ModelId]).map((event) => {
             const modelConfig = MODELS_CONFIG[event.modelId];
             
             return (

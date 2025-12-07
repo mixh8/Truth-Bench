@@ -1,4 +1,4 @@
-import { MarketEvent, MODELS_CONFIG } from "@/lib/simulation";
+import { MarketEvent, MODELS_CONFIG, ModelId } from "@/lib/simulation";
 import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
@@ -51,7 +51,7 @@ export function ReasoningFeed({ events }: ReasoningFeedProps) {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 bg-black/20">
         <AnimatePresence initial={false}>
-          {events.map((event) => {
+          {events.filter(event => MODELS_CONFIG[event.modelId as ModelId]).map((event) => {
             const modelConfig = MODELS_CONFIG[event.modelId];
             const probability = eventProbabilities.get(event.id) || 50;
             const actionText = event.action === 'Buy' ? 'bought YES' : 'bought NO';

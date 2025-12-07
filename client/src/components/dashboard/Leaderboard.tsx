@@ -1,4 +1,4 @@
-import { Model } from "@/lib/simulation";
+import { Model, MODELS_CONFIG, ModelId } from "@/lib/simulation";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Trophy } from "lucide-react";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
@@ -19,7 +19,9 @@ interface LeaderboardProps {
 }
 
 export function Leaderboard({ models }: LeaderboardProps) {
-  const sortedModels = [...models].sort((a, b) => b.currentValue - a.currentValue);
+  // Filter out models that don't exist in MODELS_CONFIG
+  const validModels = models.filter(model => MODELS_CONFIG[model.id as ModelId]);
+  const sortedModels = [...validModels].sort((a, b) => b.currentValue - a.currentValue);
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">

@@ -1,4 +1,4 @@
-import { Model, MODELS_CONFIG } from "@/lib/simulation";
+import { Model, MODELS_CONFIG, ModelId } from "@/lib/simulation";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from "date-fns";
 import { 

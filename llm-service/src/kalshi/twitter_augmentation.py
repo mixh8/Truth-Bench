@@ -336,4 +336,3 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
         'api_used': 'search_recent',
         '_api_calls': 1
     }
-
