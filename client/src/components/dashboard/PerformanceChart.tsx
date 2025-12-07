@@ -105,14 +105,23 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
   
   if (!validModels.length || !validModels[0].history.length) return null;
 
-  const chartData = validModels[0].history.map((point, index) => {
+  // Create a union of all unique timestamps across all models
+  const allTimestamps = new Set<number>();
+  validModels.forEach(model => {
+    model.history.forEach(point => allTimestamps.add(point.time));
+  });
+  
+  const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+  
+  const chartData = sortedTimestamps.map(timestamp => {
     const dataPoint: any = {
-      time: point.time,
-      formattedTime: format(point.time, 'HH:mm'),
+      time: timestamp,
+      formattedTime: format(timestamp, 'HH:mm'),
     };
     
     validModels.forEach(model => {
-      dataPoint[model.id] = model.history[index]?.value || model.currentValue;
+      const point = model.history.find(p => p.time === timestamp);
+      dataPoint[model.id] = point?.value ?? model.currentValue;
     });
     
     return dataPoint;

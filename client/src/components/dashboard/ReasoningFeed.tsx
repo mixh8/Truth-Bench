@@ -80,14 +80,21 @@ export function ReasoningFeed({ events }: ReasoningFeedProps) {
                   
                   <span>
                     {actionText} on{' '}
-                    <a 
-                      href="https://polymarket.com/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline hover:text-blue-400 transition-colors"
-                    >
-                      '{event.market}'
-                    </a>
+                    {event.marketUrl ? (
+                      <a 
+                        href={event.marketUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 hover:underline transition-colors font-medium"
+                        title="View on Kalshi"
+                      >
+                        '{event.market}'
+                      </a>
+                    ) : (
+                      <span className="text-blue-400 font-medium">
+                        '{event.market}'
+                      </span>
+                    )}
                   </span>
                   
                   <span className="text-muted-foreground">

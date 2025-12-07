@@ -50,6 +50,15 @@ _kalshi_cache = {
 _analysis_cache: dict[str, dict] = {}
 _analysis_cache_ttl = 300  # 5 minutes
 
+# Model configurations (single source of truth)
+AVAILABLE_MODELS = [
+    {"id": "grok", "model_id": "grok-4-1-fast-reasoning", "name": "Grok 4.1 Fast (Reasoning)"},  # Regular Grok without search
+    {"id": "grok-x", "model_id": "grok-4-1-fast-reasoning", "name": "Grok w/ X", "enable_x_search": True},  # Grok with X search enabled
+    {"id": "gpt-5.1", "model_id": "gpt-5.1", "name": "GPT-5.1"},
+    {"id": "anthropic/claude-opus-4-5-20251101", "model_id": "anthropic/claude-opus-4-5-20251101", "name": "Claude Opus 4.5"},
+    {"id": "gemini/gemini-3-pro", "model_id": "gemini/gemini-3-pro-preview", "name": "Gemini 3 Pro"},
+]
+
 
 def get_llm_client() -> LLMClient:
     """Get the global LLM client instance."""
@@ -260,6 +269,20 @@ class MarketAnalysisRequest(BaseModel):
     twitter_metrics: dict | None = None
 
 
+class BulkMarketData(BaseModel):
+    """Individual market data for bulk analysis."""
+    market_title: str
+    ticker: str
+    outcomes: list[MarketOutcome]
+    twitter_metrics: dict | None = None
+
+
+class BulkAnalysisRequest(BaseModel):
+    """Request for bulk market analysis."""
+    markets: list[BulkMarketData]
+    model_id: str
+
+
 class ModelPrediction(BaseModel):
     """Individual model's prediction."""
     model_id: str
@@ -371,16 +394,7 @@ async def analyze_market(request: MarketAnalysisRequest, use_cache: bool = True)
             cached_result.metadata['from_cache'] = True
             cached_result.metadata['cache_age_seconds'] = round(cache_age, 1)
             return cached_result
-    
-    # Define models to query (using the actual models from the platform)
-    models = [
-        {"id": "grok-beta", "model_id": "grok-4-1-fast-reasoning", "name": "Grok 4.1 Fast (Reasoning)"},  # Regular Grok without search
-        {"id": "grok-beta-x", "model_id": "grok-4-1-fast-reasoning", "name": "Grok w/ X", "enable_x_search": True},  # Grok with X search enabled
-        {"id": "gpt-5.1", "model_id": "gpt-5.1", "name": "GPT-5.1"},
-        {"id": "anthropic/claude-opus-4-5-20251101", "model_id": "anthropic/claude-opus-4-5-20251101", "name": "Claude Opus 4.5"},
-        {"id": "gemini/gemini-3-pro", "model_id": "gemini/gemini-3-pro-preview", "name": "Gemini 3 Pro"},
-    ]
-    
+
     # Build analysis prompt
     twitter_context = ""
     if request.twitter_metrics:
@@ -491,7 +505,7 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
             )
     
     # Run ALL models in parallel using asyncio.gather for 5x speedup!
-    predictions = await asyncio.gather(*[query_model(m) for m in models])
+    predictions = await asyncio.gather(*[query_model(m) for m in AVAILABLE_MODELS])
     
     # Calculate consensus
     yes_votes = [p for p in predictions if p.vote == "YES"]
@@ -512,7 +526,7 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
         consensus=consensus,
         metadata={
             "analyzed_at": datetime.utcnow().isoformat() + 'Z',
-            "models_queried": len(models),
+            "models_queried": len(AVAILABLE_MODELS),
             "successful_predictions": len([p for p in predictions if "error" not in p.reasoning.lower()]),
             "from_cache": False
         }
@@ -525,6 +539,176 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
     }
     
     return result
+
+
+@app.post("/api/kalshi/analyze-bulk", tags=["Kalshi"])
+async def analyze_markets_bulk(request: BulkAnalysisRequest):
+    """
+    Analyze multiple markets in a single LLM call for one model (massive cost/time savings!)
+    
+    Request format:
+    {
+        "markets": [
+            {
+                "market_title": "...",
+                "ticker": "...",
+                "outcomes": [...],
+                "twitter_metrics": {...}
+            },
+            ...
+        ],
+        "model_id": "grok-beta-x"  // Single model to query
+    }
+    
+    Returns predictions array with ticker field for mapping.
+    """
+    logger = get_logger()
+    
+    try:
+        markets_data = request.markets
+        model_id = request.model_id
+        
+        if not markets_data:
+            raise HTTPException(status_code=400, detail="No markets provided")
+        
+        if not model_id:
+            raise HTTPException(status_code=400, detail="No model_id provided")
+        
+        # Find the model config
+        model_config = next((m for m in AVAILABLE_MODELS if m.get("id") == model_id or m.get("model_id") == model_id), None)
+        if not model_config:
+            raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+        
+        # Build a combined prompt with ALL markets
+        markets_text = ""
+        for i, market_data in enumerate(markets_data, 1):
+            market_title = market_data.market_title
+            ticker = market_data.ticker
+            outcomes = market_data.outcomes
+            twitter_metrics = market_data.twitter_metrics
+            
+            outcomes_text = "\n".join([
+                f"  - {o.label}: {o.current_price}¢ (market implies {o.current_price}% probability)"
+                for o in outcomes
+            ])
+            
+            twitter_context = ""
+            if twitter_metrics:
+                twitter_context = f"""
+Twitter Activity (Last 24h):
+- Total tweets: {twitter_metrics.get('total_tweets', 0)}
+- Tweet velocity (24h): {twitter_metrics.get('tweet_velocity_24h', 0)} tweets
+- Unique authors: {twitter_metrics.get('unique_authors', 0)}
+- Avg engagement rate: {twitter_metrics.get('avg_engagement_rate', 0.0):.2f}%
+- Verified users: {twitter_metrics.get('verified_count', 0)}
+"""
+            
+            markets_text += f"""
+MARKET #{i} (Ticker: {ticker}):
+Question: {market_title}
+Outcomes:
+{outcomes_text}
+{twitter_context}
+
+"""
+        
+        # Create the combined prompt
+        prompt = f"""You are analyzing {len(markets_data)} prediction markets. For EACH market, provide your analysis.
+
+{markets_text}
+
+For EACH market above, provide your analysis in this EXACT format:
+
+MARKET: [Ticker]
+OUTCOME: [Your predicted outcome label, e.g., "YES"]
+CONFIDENCE: [0-100]
+REASONING: [2-3 sentences explaining why]
+
+---
+
+Repeat this format for all {len(markets_data)} markets."""
+        
+        client = get_llm_client()
+        
+        logger.info(f"Bulk analyzing {len(markets_data)} markets with {model_config['name']}...")
+        
+        # Query the LLM once with all markets
+        chat_request = ChatRequest(
+            model=model_config.get("model_id", model_config["id"]),
+            messages=[ChatMessage(role="user", content=prompt)],
+            temperature=0.7,
+            max_tokens=1000,  # More tokens for multiple markets
+            x_search=model_config.get("enable_x_search", False)
+        )
+        
+        response = await client.achat_completion(chat_request)
+        
+        # Parse response
+        if hasattr(response, 'choices') and response.choices:
+            content = response.choices[0].message.content
+        elif hasattr(response, 'message'):
+            content = response.message.content if hasattr(response.message, 'content') else str(response.message)
+        else:
+            content = str(response)
+        
+        # Parse out predictions for each market
+        import re
+        predictions = []
+        
+        # Split by market sections
+        market_sections = re.split(r'---+', content)
+        
+        for market_data in markets_data:
+            ticker = market_data.ticker
+            
+            # Try to find this ticker's prediction in the response
+            market_pattern = rf'MARKET:\s*{re.escape(ticker)}.*?OUTCOME:\s*(.+?).*?CONFIDENCE:\s*(\d+).*?REASONING:\s*(.+?)(?=MARKET:|---|\Z)'
+            match = re.search(market_pattern, content, re.DOTALL | re.IGNORECASE)
+            
+            if match:
+                predicted_outcome = match.group(1).strip()
+                confidence = int(match.group(2).strip())
+                reasoning = match.group(3).strip()
+                
+                # Determine vote (YES/NO)
+                vote = "YES" if "YES" in predicted_outcome.upper() else "NO"
+                
+                predictions.append({
+                    "ticker": ticker,
+                    "model_id": model_id,
+                    "vote": vote,
+                    "predicted_outcome": predicted_outcome,
+                    "confidence": min(100, max(0, confidence)),
+                    "reasoning": reasoning,
+                    "timestamp": datetime.utcnow().isoformat() + 'Z'
+                })
+            else:
+                # Fallback if parsing fails
+                logger.warning(f"Could not parse prediction for {ticker}, using default")
+                predictions.append({
+                    "ticker": ticker,
+                    "model_id": model_id,
+                    "vote": "YES",
+                    "predicted_outcome": "YES",
+                    "confidence": 50,
+                    "reasoning": "Analysis parsing failed",
+                    "timestamp": datetime.utcnow().isoformat() + 'Z'
+                })
+        
+        logger.info(f"Bulk analysis complete: {len(predictions)} predictions")
+        
+        return {
+            "predictions": predictions,
+            "metadata": {
+                "analyzed_at": datetime.utcnow().isoformat() + 'Z',
+                "markets_count": len(markets_data),
+                "model": model_config["name"]
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Bulk analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Bulk analysis failed: {str(e)}")
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])

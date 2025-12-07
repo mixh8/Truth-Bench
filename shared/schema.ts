@@ -41,6 +41,7 @@ export const marketEvents = pgTable("market_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   modelId: varchar("model_id").notNull(),
   market: text("market").notNull(),
+  marketUrl: text("market_url"), // Kalshi market URL
   action: text("action").notNull(), // 'Buy', 'Sell', 'Hold'
   comment: text("comment").notNull(),
   profit: real("profit"),
