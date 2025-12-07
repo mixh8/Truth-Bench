@@ -24,6 +24,7 @@ export interface MarketEvent {
   comment: string;
   timestamp: number | Date;
   profit?: number;
+  probability?: number;
 }
 
 export const INITIAL_CAPITAL = 10000;
@@ -154,8 +155,8 @@ export function useSimulation() {
         body: JSON.stringify(event)
       }).then(r => r.json()),
     onSuccess: (newEvent) => {
-      setLocalEvents(prev => [newEvent, ...prev].slice(0, 20));
-      queryClient.setQueryData(['events'], (old: MarketEvent[]) => [newEvent, ...old].slice(0, 20));
+      setLocalEvents(prev => [newEvent, ...prev].slice(0, 5));
+      queryClient.setQueryData(['events'], (old: MarketEvent[]) => [newEvent, ...old].slice(0, 5));
     }
   });
 

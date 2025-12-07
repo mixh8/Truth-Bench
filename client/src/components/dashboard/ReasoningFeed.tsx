@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
 import { Terminal } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 
 const ModelIcon = ({ id, className }: { id: string, className?: string }) => {
   switch (id) {
@@ -23,6 +23,17 @@ interface ReasoningFeedProps {
 
 export function ReasoningFeed({ events }: ReasoningFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const probabilityMapRef = useRef(new Map<string, number>());
+
+  // Generate and cache probability for each event
+  const eventProbabilities = useMemo(() => {
+    events.forEach(event => {
+      if (!probabilityMapRef.current.has(event.id)) {
+        probabilityMapRef.current.set(event.id, Math.floor(Math.random() * 99) + 1);
+      }
+    });
+    return probabilityMapRef.current;
+  }, [events]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -43,8 +54,7 @@ export function ReasoningFeed({ events }: ReasoningFeedProps) {
         <AnimatePresence initial={false}>
           {events.map((event) => {
             const modelConfig = MODELS_CONFIG[event.modelId];
-            // Mock probability for visual effect
-            const probability = Math.floor(Math.random() * 99) + 1;
+            const probability = eventProbabilities.get(event.id) || 50;
             const actionText = event.action === 'Buy' ? 'bought YES' : 'bought NO';
             
             return (
