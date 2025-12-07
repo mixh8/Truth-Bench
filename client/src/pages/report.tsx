@@ -1,12 +1,10 @@
-import { useSimulation, Model, MarketEvent, INITIAL_CAPITAL } from "@/lib/simulation";
 import { Badge } from "@/components/ui/badge";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Link } from "wouter";
-import { FileText, LayoutDashboard, ArrowUpDown, AlertTriangle, TrendingUp, Shield } from "lucide-react";
+import { FileText, LayoutDashboard, ArrowUpDown, AlertTriangle, TrendingUp, Shield, Zap } from "lucide-react";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 
 const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
   switch (id) {
@@ -23,67 +21,110 @@ const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
 interface ModelMetrics {
   id: string;
   name: string;
-  avatar: string;
   totalReturn: number;
   winRate: number;
   sharpeRatio: number;
   maxDrawdown: number;
-  currentValue: number;
+  truthScore: number;
 }
 
-type SortField = 'totalReturn' | 'winRate' | 'sharpeRatio' | 'maxDrawdown';
+type SortField = 'truthScore' | 'totalReturn' | 'winRate' | 'sharpeRatio' | 'maxDrawdown';
 type SortDirection = 'asc' | 'desc';
 
-const MODEL_PERSONA_METRICS: Record<string, { sharpeRatio: number; maxDrawdown: number; winRateBoost: number }> = {
-  grok_heavy_x: { sharpeRatio: 1.35, maxDrawdown: -32.5, winRateBoost: 0.85 },
-  grok_heavy: { sharpeRatio: 1.48, maxDrawdown: -28.7, winRateBoost: 0.88 },
-  claude_opus: { sharpeRatio: 2.34, maxDrawdown: -11.2, winRateBoost: 1.15 },
-  gpt_5: { sharpeRatio: 1.72, maxDrawdown: -18.4, winRateBoost: 1.0 },
-  gemini_pro: { sharpeRatio: 1.18, maxDrawdown: -26.3, winRateBoost: 0.92 },
-  deepseek_v3: { sharpeRatio: 1.56, maxDrawdown: -15.8, winRateBoost: 1.35 },
-};
-
-function calculateModelMetrics(model: Model, events: MarketEvent[]): ModelMetrics {
-  const totalReturn = ((model.currentValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
+function calculateTruthScore(totalReturn: number, maxDrawdown: number, sharpeRatio: number, winRate: number): number {
+  const returnScore = (totalReturn / 20) * 100;
+  const drawdownScore = 100 - (1.5 * Math.abs(maxDrawdown));
+  const sharpeScore = (sharpeRatio / 3.0) * 100;
+  const winRateScore = (winRate / 50) * 100;
   
-  const modelEvents = events.filter(e => e.modelId === model.id);
-  const profitableEvents = modelEvents.filter(e => e.profit && e.profit > 0);
-  const baseWinRate = modelEvents.length > 0 
-    ? (profitableEvents.length / modelEvents.length) * 100 
-    : 50;
+  const truthScore = (returnScore * 0.60) + (drawdownScore * 0.15) + (sharpeScore * 0.15) + (winRateScore * 0.10);
+  return Math.max(0, Math.min(100, truthScore));
+}
 
-  const persona = MODEL_PERSONA_METRICS[model.id] || { sharpeRatio: 1.5, maxDrawdown: -15, winRateBoost: 1.0 };
-  const adjustedWinRate = Math.max(35, Math.min(85, baseWinRate * persona.winRateBoost));
+const HARDCODED_MODELS: ModelMetrics[] = [
+  {
+    id: 'grok_heavy_x',
+    name: 'Grok 4 Heavy w/ X',
+    totalReturn: 19.54,
+    winRate: 35.0,
+    sharpeRatio: 1.35,
+    maxDrawdown: -32.50,
+    truthScore: 0,
+  },
+  {
+    id: 'grok_heavy',
+    name: 'Grok 4 Heavy',
+    totalReturn: 12.50,
+    winRate: 38.0,
+    sharpeRatio: 1.60,
+    maxDrawdown: -24.50,
+    truthScore: 0,
+  },
+  {
+    id: 'gpt_5',
+    name: 'GPT-5.1',
+    totalReturn: 9.34,
+    winRate: 35.0,
+    sharpeRatio: 1.72,
+    maxDrawdown: -18.40,
+    truthScore: 0,
+  },
+  {
+    id: 'gemini_pro',
+    name: 'Gemini 3 Pro',
+    totalReturn: 4.18,
+    winRate: 35.0,
+    sharpeRatio: 1.18,
+    maxDrawdown: -26.30,
+    truthScore: 0,
+  },
+  {
+    id: 'claude_opus',
+    name: 'Claude Opus 4.5',
+    totalReturn: 2.93,
+    winRate: 35.0,
+    sharpeRatio: 2.34,
+    maxDrawdown: -11.20,
+    truthScore: 0,
+  },
+  {
+    id: 'deepseek_v3',
+    name: 'DeepSeek-V3.2',
+    totalReturn: 0.99,
+    winRate: 35.0,
+    sharpeRatio: 1.56,
+    maxDrawdown: -15.80,
+    truthScore: 0,
+  },
+].map(model => ({
+  ...model,
+  truthScore: calculateTruthScore(model.totalReturn, model.maxDrawdown, model.sharpeRatio, model.winRate),
+}));
 
-  return {
-    id: model.id,
-    name: model.name,
-    avatar: model.avatar,
-    totalReturn,
-    winRate: Math.round(adjustedWinRate * 10) / 10,
-    sharpeRatio: persona.sharpeRatio,
-    maxDrawdown: persona.maxDrawdown,
-    currentValue: model.currentValue,
-  };
+function getTruthScoreLabel(score: number): { label: string; className: string } {
+  if (score >= 70) return { label: 'Elite', className: 'text-cyan-400' };
+  if (score >= 55) return { label: 'Strong', className: 'text-emerald-400' };
+  if (score >= 40) return { label: 'Moderate', className: 'text-amber-400' };
+  return { label: 'Mediocre', className: 'text-amber-500' };
 }
 
 function RiskDeskAnalysis({ metrics }: { metrics: ModelMetrics[] }) {
-  const sortedByReturn = [...metrics].sort((a, b) => b.totalReturn - a.totalReturn);
+  const sortedByScore = [...metrics].sort((a, b) => b.truthScore - a.truthScore);
   const sortedBySharpe = [...metrics].sort((a, b) => b.sharpeRatio - a.sharpeRatio);
   const sortedByDrawdown = [...metrics].sort((a, b) => a.maxDrawdown - b.maxDrawdown);
 
-  const leader = sortedByReturn[0];
+  const leader = sortedByScore[0];
   const safest = sortedBySharpe[0];
   const riskiest = sortedByDrawdown[sortedByDrawdown.length - 1];
 
   const analysis = useMemo(() => {
     if (leader && safest && riskiest) {
       if (leader.id === safest.id) {
-        return `${leader.name} is leading with ${leader.totalReturn.toFixed(1)}% returns while maintaining the healthiest risk profile (Sharpe: ${leader.sharpeRatio.toFixed(2)}).`;
+        return `${leader.name} dominates with a Truth Score of ${leader.truthScore.toFixed(0)}/100, combining ${leader.totalReturn.toFixed(1)}% returns with the healthiest risk profile (Sharpe: ${leader.sharpeRatio.toFixed(2)}).`;
       } else if (leader.maxDrawdown < -25) {
-        return `${leader.name} is currently leading in returns but suffers from a dangerous ${Math.abs(leader.maxDrawdown).toFixed(0)}% Max Drawdown, while ${safest.name} maintains the healthiest Sharpe Ratio at ${safest.sharpeRatio.toFixed(2)}.`;
+        return `${leader.name} leads with a Truth Score of ${leader.truthScore.toFixed(0)}/100 despite a dangerous ${Math.abs(leader.maxDrawdown).toFixed(0)}% Max Drawdown, while ${safest.name} maintains the healthiest Sharpe Ratio at ${safest.sharpeRatio.toFixed(2)}.`;
       } else {
-        return `${leader.name} leads with ${leader.totalReturn.toFixed(1)}% returns. ${safest.name} shows the best risk-adjusted performance (Sharpe: ${safest.sharpeRatio.toFixed(2)}), while ${riskiest.name} carries the highest risk exposure.`;
+        return `${leader.name} leads with a Truth Score of ${leader.truthScore.toFixed(0)}/100 and ${leader.totalReturn.toFixed(1)}% returns. ${safest.name} shows the best risk-adjusted performance (Sharpe: ${safest.sharpeRatio.toFixed(2)}), while ${riskiest.name} carries the highest risk exposure.`;
       }
     }
     return "Analyzing market conditions...";
@@ -103,37 +144,22 @@ function RiskDeskAnalysis({ metrics }: { metrics: ModelMetrics[] }) {
 }
 
 export default function Report() {
-  const { models } = useSimulation();
-  const [sortField, setSortField] = useState<SortField>('totalReturn');
+  const [sortField, setSortField] = useState<SortField>('truthScore');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  const { data: allEvents = [] } = useQuery({
-    queryKey: ['allSeededEvents'],
-    queryFn: async () => {
-      const res = await fetch('/api/events/all');
-      if (!res.ok) throw new Error('Failed to fetch events');
-      return res.json() as Promise<MarketEvent[]>;
-    },
-    staleTime: Infinity,
-  });
-
-  const metrics = useMemo(() => {
-    return models.map(model => calculateModelMetrics(model, allEvents));
-  }, [models, allEvents]);
-
   const sortedMetrics = useMemo(() => {
-    const sorted = [...metrics].sort((a, b) => {
+    const sorted = [...HARDCODED_MODELS].sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
       
       if (sortField === 'maxDrawdown') {
-        return sortDirection === 'desc' ? bVal - aVal : aVal - bVal;
+        return sortDirection === 'desc' ? aVal - bVal : bVal - aVal;
       }
       
       return sortDirection === 'desc' ? bVal - aVal : aVal - bVal;
     });
     return sorted;
-  }, [metrics, sortField, sortDirection]);
+  }, [sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -154,7 +180,7 @@ export default function Report() {
         {children}
         <ArrowUpDown className={cn(
           "w-3 h-3",
-          sortField === field ? "text-emerald-500" : "text-slate-600"
+          sortField === field ? "text-cyan-500" : "text-slate-600"
         )} />
       </div>
     </th>
@@ -172,7 +198,7 @@ export default function Report() {
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
                 </Link>
-                <Link href="/report" className="flex items-center gap-2 px-3 py-2 text-sm text-emerald-500 bg-emerald-500/10 rounded-md" data-testid="link-report">
+                <Link href="/report" className="flex items-center gap-2 px-3 py-2 text-sm text-cyan-500 bg-cyan-500/10 rounded-md" data-testid="link-report">
                   <FileText className="w-4 h-4" />
                   Report
                 </Link>
@@ -187,11 +213,11 @@ export default function Report() {
         <header className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Performance Report</h1>
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-              LIVE DATA
+            <Badge variant="outline" className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20">
+              ALPHA RANKED
             </Badge>
           </div>
-          <p className="text-muted-foreground">Financial performance metrics for all trading models</p>
+          <p className="text-muted-foreground">Financial performance metrics ranked by Truth Score algorithm</p>
         </header>
 
         <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
@@ -200,6 +226,7 @@ export default function Report() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rank</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Model</th>
+                <SortHeader field="truthScore">Truth Score</SortHeader>
                 <SortHeader field="totalReturn">Total Return</SortHeader>
                 <SortHeader field="winRate">Win Rate</SortHeader>
                 <SortHeader field="sharpeRatio">Sharpe Ratio</SortHeader>
@@ -212,6 +239,7 @@ export default function Report() {
                 const isDangerousDrawdown = metric.maxDrawdown < -20;
                 const isExcellentSharpe = metric.sharpeRatio >= 2.0;
                 const isPoorSharpe = metric.sharpeRatio < 1.0;
+                const scoreInfo = getTruthScoreLabel(metric.truthScore);
 
                 return (
                   <tr 
@@ -222,9 +250,9 @@ export default function Report() {
                     <td className="px-4 py-4">
                       <div className={cn(
                         "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold",
-                        index === 0 ? "bg-yellow-500/20 text-yellow-500" :
-                        index === 1 ? "bg-slate-500/20 text-slate-400" :
-                        index === 2 ? "bg-amber-700/20 text-amber-600" : 
+                        index === 0 ? "bg-cyan-500/20 text-cyan-400" :
+                        index === 1 ? "bg-cyan-500/10 text-cyan-500/80" :
+                        index === 2 ? "bg-slate-500/20 text-slate-400" : 
                         "bg-slate-800 text-slate-500"
                       )}>
                         {index + 1}
@@ -237,10 +265,18 @@ export default function Report() {
                           <div className="font-medium text-slate-200" data-testid={`text-model-name-${metric.id}`}>
                             {metric.name}
                           </div>
-                          <div className="text-xs text-slate-500">
-                            ${metric.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                          </div>
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <Zap className={cn("w-3 h-3", scoreInfo.className)} />
+                        <span className={cn("font-mono font-bold text-sm", scoreInfo.className)} data-testid={`text-truthscore-${metric.id}`}>
+                          {metric.truthScore.toFixed(0)}
+                        </span>
+                        <span className={cn("text-xs", scoreInfo.className)}>
+                          {scoreInfo.label}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-4">
@@ -290,7 +326,7 @@ export default function Report() {
           </table>
         </div>
 
-        <RiskDeskAnalysis metrics={metrics} />
+        <RiskDeskAnalysis metrics={HARDCODED_MODELS} />
       </main>
     </div>
   );
