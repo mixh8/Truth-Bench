@@ -404,6 +404,7 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
                 model_id=model["id"],
                 name=model["name"],
                 vote=vote,
+                predicted_outcome=predicted_outcome,
                 confidence=min(100, max(0, confidence)),
                 reasoning=reasoning,
                 timestamp=datetime.utcnow().isoformat() + 'Z'
@@ -417,6 +418,7 @@ Important: Choose ONE outcome from the list above and use its EXACT label."""
                 model_id=model["id"],
                 name=model["name"],
                 vote="YES",  # Default to yes for the top outcome
+                predicted_outcome=top_outcome.label,
                 confidence=50,
                 reasoning=f"Analysis unavailable. Error: {type(e).__name__}",
                 timestamp=datetime.utcnow().isoformat() + 'Z'
