@@ -9,8 +9,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Seed trades on startup
-  await seedTrades();
+  // Seed trades on startup (non-blocking, error-tolerant)
+  seedTrades().catch((err) => {
+    console.error("Failed to seed trades (non-fatal):", err.message);
+  });
 
   // Get all events ordered by timestamp (for cycling through)
   app.get("/api/events/all", async (req, res) => {

@@ -56,38 +56,43 @@ function generateRandomProbability(): number {
 }
 
 export async function seedTrades(): Promise<void> {
-  console.log("Checking for existing seeded trades...");
-  
-  const existing = await db.select().from(marketEvents).limit(1);
-  if (existing.length > 0) {
-    console.log("Trades already exist. Skipping seed.");
-    return;
-  }
-
-  console.log("Seeding 100 trades...");
-  
-  const trades = [];
-  const baseTime = Date.now() - 100 * 60 * 1000;
-  
-  for (let i = 0; i < 100; i++) {
-    const isBullish = Math.random() > 0.45;
-    const modelId = getRandomElement(MODELS);
-    const market = getRandomElement(MARKETS);
-    const action = isBullish ? 'Buy' : 'Sell';
-    const comment = isBullish 
-      ? getRandomElement(BULLISH_COMMENTS)
-      : getRandomElement(BEARISH_COMMENTS);
+  try {
+    console.log("Checking for existing seeded trades...");
     
-    trades.push({
-      modelId,
-      market,
-      action,
-      comment,
-      timestamp: new Date(baseTime + i * 60 * 1000),
-    });
-  }
+    const existing = await db.select().from(marketEvents).limit(1);
+    if (existing.length > 0) {
+      console.log("Trades already exist. Skipping seed.");
+      return;
+    }
 
-  await db.insert(marketEvents).values(trades);
-  console.log("Successfully seeded 100 trades!");
+    console.log("Seeding 100 trades...");
+    
+    const trades = [];
+    const baseTime = Date.now() - 100 * 60 * 1000;
+    
+    for (let i = 0; i < 100; i++) {
+      const isBullish = Math.random() > 0.45;
+      const modelId = getRandomElement(MODELS);
+      const market = getRandomElement(MARKETS);
+      const action = isBullish ? 'Buy' : 'Sell';
+      const comment = isBullish 
+        ? getRandomElement(BULLISH_COMMENTS)
+        : getRandomElement(BEARISH_COMMENTS);
+      
+      trades.push({
+        modelId,
+        market,
+        action,
+        comment,
+        timestamp: new Date(baseTime + i * 60 * 1000),
+      });
+    }
+
+    await db.insert(marketEvents).values(trades);
+    console.log("Successfully seeded 100 trades!");
+  } catch (error) {
+    console.error("Database error during seed:", error instanceof Error ? error.message : error);
+    throw error;
+  }
 }
 
