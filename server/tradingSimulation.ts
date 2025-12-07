@@ -5,7 +5,7 @@ import { RiskEngine, RISK_PARAMS, type Position, type ModelPortfolio } from "./r
 export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5';
 
 export const INITIAL_CAPITAL = 10000;
-const LLM_SERVICE_URL = 'http://localhost:8000';
+const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
 
 // Environment variable to toggle between real and simulated trading
 const USE_SIMULATED_TRADING = process.env.USE_SIMULATED_TRADING === 'true';
