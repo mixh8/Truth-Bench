@@ -220,10 +220,6 @@ class KalshiClient:
         Returns:
             List of settled market dictionaries.
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        logger.debug(f"Fetching settled markets for series: {series_ticker}")
         markets = []
         cursor = None
 
@@ -243,13 +239,68 @@ class KalshiClient:
             response = self._get("/markets", params=params)
             batch = response.get("markets", [])
             markets.extend(batch)
-            logger.debug(f"Retrieved batch of {len(batch)} markets, total: {len(markets)}")
 
             cursor = response.get("cursor")
             if not cursor:
                 break
 
-        logger.info(f"Retrieved {len(markets)} settled markets for series {series_ticker}")
+        return markets
+
+    def get_all_settled_markets(
+        self,
+        min_close_ts: int | None = None,
+        max_close_ts: int | None = None,
+        limit: int = 1000,
+        max_total: int | None = None,
+    ) -> list[dict]:
+        """Fetch ALL settled markets (no series filter) within a time range.
+
+        This is more efficient than querying each series individually.
+
+        Args:
+            min_close_ts: Minimum close timestamp (Unix seconds).
+            max_close_ts: Maximum close timestamp (Unix seconds).
+            limit: Maximum number of markets per page (max 1000).
+            max_total: Optional cap on total markets to fetch.
+
+        Returns:
+            List of all settled market dictionaries.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Fetching all settled markets (batch mode, max_total={max_total})")
+        markets = []
+        cursor = None
+
+        while True:
+            params = {
+                "status": "settled",
+                "limit": limit,
+            }
+            if min_close_ts:
+                params["min_close_ts"] = min_close_ts
+            if max_close_ts:
+                params["max_close_ts"] = max_close_ts
+            if cursor:
+                params["cursor"] = cursor
+
+            response = self._get("/markets", params=params)
+            batch = response.get("markets", [])
+            markets.extend(batch)
+            logger.info(f"Retrieved batch of {len(batch)} markets, total so far: {len(markets)}")
+
+            # Check if we've hit the cap
+            if max_total and len(markets) >= max_total:
+                logger.info(f"Reached max_total cap of {max_total}")
+                markets = markets[:max_total]
+                break
+
+            cursor = response.get("cursor")
+            if not cursor:
+                break
+
+        logger.info(f"Retrieved {len(markets)} total settled markets")
         return markets
 
     def get_market_candlesticks(
