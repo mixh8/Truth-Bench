@@ -120,7 +120,7 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                minTickGap={40}
+                minTickGap={100}
                 dy={10}
             />
             <YAxis 
@@ -132,7 +132,15 @@ export function PerformanceChart({ models }: PerformanceChartProps) {
                 domain={['auto', 'auto']}
                 width={60}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              content={<CustomTooltip />} 
+              cursor={{ 
+                stroke: 'hsl(var(--muted-foreground))', 
+                strokeWidth: 1, 
+                strokeDasharray: '4 4',
+                opacity: 0.5
+              }}
+            />
             {models.map(model => (
                 <Line
                     key={model.id}
