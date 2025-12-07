@@ -17,6 +17,10 @@
     {
       "source": "/health",
       "destination": "https://truth-bench.onrender.com/health"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
