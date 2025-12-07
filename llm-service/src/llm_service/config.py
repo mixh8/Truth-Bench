@@ -50,6 +50,8 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5001",
             "http://localhost:5002",
             "http://127.0.0.1:5002",
+            "https://truth-bench-9xt9.onrender.com",
+            "https://truth-bench.onrender.com",
         ],
         description="Allowed CORS origins",
     )
