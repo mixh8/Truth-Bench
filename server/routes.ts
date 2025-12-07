@@ -9,10 +9,13 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Seed trades on startup (non-blocking, error-tolerant)
-  seedTrades().catch((err) => {
-    console.error("Failed to seed trades (non-fatal):", err.message);
-  });
+  // Seed trades on startup (BLOCKING - must complete before serving requests)
+  try {
+    await seedTrades();
+    console.log("[Server] Trade seeding complete, starting routes...");
+  } catch (err) {
+    console.error("[Server] Failed to seed trades:", err instanceof Error ? err.message : err);
+  }
 
   // Get all events ordered by timestamp (for cycling through)
   app.get("/api/events/all", async (req, res) => {
