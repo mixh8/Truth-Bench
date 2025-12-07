@@ -120,7 +120,7 @@ export interface TwitterMetrics {
   total_replies: number;
   verified_user_tweets: number;
   unique_authors: number;
-  top_tweets: Array<{
+  top_posts: Array<{
     id: string;
     text: string;
     author_username: string;
@@ -134,6 +134,8 @@ export interface TwitterMetrics {
     };
     url: string;
   }>;
+  // Back-compat for older responses
+  top_tweets?: TwitterMetrics["top_posts"];
   top_hashtags: Array<{
     tag: string;
     count: number;
@@ -272,7 +274,7 @@ export interface MarketOutcome {
 export interface MarketAnalysisRequest {
   market_title: string;
   outcomes: MarketOutcome[];
-  twitter_metrics?: TweetMetrics | null;
+  twitter_metrics?: TwitterMetrics | null;
 }
 
 export interface MarketAnalysisResponse {
