@@ -102,15 +102,17 @@ export default function Report() {
     queryFn: async () => {
       const res = await fetch('/api/models');
       if (!res.ok) throw new Error('Failed to fetch models');
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
     refetchInterval: 1000,
   });
 
   const metrics: ModelMetrics[] = useMemo(() => {
-    if (!apiModels) return [];
-    
-    return apiModels.map((model: { id: string; name: string; currentValue: number }) => {
+    const models = Array.isArray(apiModels) ? apiModels : [];
+    if (!models.length) return [];
+
+    return models.map((model: { id: string; name: string; currentValue: number }) => {
       const staticMetrics = STATIC_METRICS[model.id] || { winRate: 30, sharpeRatio: 1.0, maxDrawdown: -20 };
       const totalReturn = ((model.currentValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
       
