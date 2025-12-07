@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type ModelId = 'grok_heavy_x' | 'grok_heavy' | 'gemini_pro' | 'claude_opus' | 'gpt_5' | 'deepseek_v3';
@@ -136,6 +136,9 @@ export function useSimulation() {
   const [isPlaying, setIsPlaying] = useState(true);
   const timeRef = useRef(Date.now());
   const initializeModelsOnce = useRef(false);
+  const [tradeIndex, setTradeIndex] = useState(0);
+  const nextIntervalRef = useRef(2000 + Math.random() * 8000);
+  const seededEventsRef = useRef<MarketEvent[]>([]);
 
   // Mutations - must be created unconditionally at hook level
   const updateModelMutation = useMutation({
@@ -188,6 +191,16 @@ export function useSimulation() {
       return res.json() as Promise<MarketEvent[]>;
     },
     staleTime: 5000,
+  });
+
+  const { data: allSeededEvents } = useQuery({
+    queryKey: ['allSeededEvents'],
+    queryFn: async () => {
+      const res = await fetch('/api/events/all');
+      if (!res.ok) throw new Error('Failed to fetch seeded events');
+      return res.json() as Promise<MarketEvent[]>;
+    },
+    staleTime: Infinity,
   });
 
   const { data: marketState } = useQuery({
@@ -300,34 +313,53 @@ export function useSimulation() {
         return updated;
       });
 
-      if (Math.random() > 0.6) {
-        const randomModel = Object.values(MODELS_CONFIG)[Math.floor(Math.random() * 6)];
-        const market = MARKETS[Math.floor(Math.random() * MARKETS.length)];
-        const isBullish = Math.random() > 0.5;
-        const type = isBullish ? 'bullish' : 'bearish';
-        const action = isBullish ? 'Buy' : 'Sell';
-        const comment = COMMENTS[type][Math.floor(Math.random() * COMMENTS[type].length)];
-        const tradeAmount = Math.floor(Math.random() * 45000) + 5000;
-
-        setLocalTotalVolume(prev => {
-          const newVolume = prev + tradeAmount;
-          updateStateMutation.mutate({ totalVolume: newVolume });
-          return newVolume;
-        });
-
-        createEventMutation.mutate({
-          modelId: randomModel.id as ModelId,
-          market,
-          action,
-          comment,
-          timestamp: now
-        });
-      }
-
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, updateModelMutation, createEventMutation, updateStateMutation]);
+  }, [isPlaying, updateModelMutation]);
+
+  useEffect(() => {
+    if (allSeededEvents?.length) {
+      seededEventsRef.current = allSeededEvents;
+    }
+  }, [allSeededEvents]);
+
+  const hasSeededEvents = Boolean(allSeededEvents?.length);
+
+  useEffect(() => {
+    if (!isPlaying || !hasSeededEvents || !seededEventsRef.current.length) return;
+
+    const advanceTrade = () => {
+      const events = seededEventsRef.current;
+      if (!events.length) return;
+      
+      setTradeIndex(prev => {
+        const nextIndex = (prev + 1) % events.length;
+        const startIdx = Math.max(0, nextIndex - 4);
+        const visibleTrades = events.slice(startIdx, nextIndex + 1).reverse();
+        setLocalEvents(visibleTrades);
+        return nextIndex;
+      });
+      
+      const tradeAmount = Math.floor(Math.random() * 45000) + 5000;
+      setLocalTotalVolume(vol => vol + tradeAmount);
+      
+      nextIntervalRef.current = 2000 + Math.random() * 8000;
+    };
+
+    advanceTrade();
+
+    const scheduleNext = () => {
+      return setTimeout(() => {
+        advanceTrade();
+        timeoutId = scheduleNext();
+      }, nextIntervalRef.current);
+    };
+
+    let timeoutId = scheduleNext();
+
+    return () => clearTimeout(timeoutId);
+  }, [isPlaying, hasSeededEvents]);
 
   return { models: localModels, events: localEvents, totalVolume: localTotalVolume, isPlaying, setIsPlaying };
 }

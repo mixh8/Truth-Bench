@@ -91,11 +91,3 @@ export async function seedTrades(): Promise<void> {
   console.log("Successfully seeded 100 trades!");
 }
 
-if (require.main === module) {
-  seedTrades()
-    .then(() => process.exit(0))
-    .catch((err) => {
-      console.error("Error seeding trades:", err);
-      process.exit(1);
-    });
-}
