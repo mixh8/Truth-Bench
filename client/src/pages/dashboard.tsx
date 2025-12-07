@@ -4,7 +4,7 @@ import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { ReasoningFeed } from "@/components/dashboard/ReasoningFeed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RefreshCw, LayoutDashboard, FileText } from "lucide-react";
+import { Play, Pause, RefreshCw, LayoutDashboard, FileText, Search } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Link } from "wouter";
 
@@ -26,6 +26,10 @@ export default function Dashboard() {
                 <Link href="/report" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors" data-testid="link-report">
                   <FileText className="w-4 h-4" />
                   Report
+                </Link>
+                <Link href="/analyze" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors" data-testid="link-analyze">
+                  <Search className="w-4 h-4" />
+                  Analyze
                 </Link>
               </div>
             </div>

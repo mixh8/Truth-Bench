@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Link } from "wouter";
-import { FileText, LayoutDashboard, ArrowUpDown, AlertTriangle, TrendingUp, Shield, Zap, Info } from "lucide-react";
+import { FileText, LayoutDashboard, ArrowUpDown, AlertTriangle, TrendingUp, Shield, Zap, Info, Search } from "lucide-react";
 import { OpenAIIcon, ClaudeIcon, GrokIcon, GeminiIcon, DeepSeekIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
@@ -202,6 +202,10 @@ export default function Report() {
                 <Link href="/report" className="flex items-center gap-2 px-3 py-2 text-sm text-cyan-500 bg-cyan-500/10 rounded-md" data-testid="link-report">
                   <FileText className="w-4 h-4" />
                   Report
+                </Link>
+                <Link href="/analyze" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors" data-testid="link-analyze">
+                  <Search className="w-4 h-4" />
+                  Analyze
                 </Link>
               </div>
             </div>
