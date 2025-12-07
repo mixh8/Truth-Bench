@@ -287,7 +287,7 @@ function ConsensusPanel({ market, votes }: { market: Market; votes: ModelVote[] 
               "w-5 h-5",
               analysis.recommendation === 'YES' ? "text-emerald-400" : "text-rose-400"
             )} />
-            <span className="text-sm font-semibold text-slate-300">AlphaBench Consensus</span>
+            <span className="text-sm font-semibold text-slate-300">TruthBench Consensus</span>
           </div>
           <div className="flex items-center justify-between">
             <div>
