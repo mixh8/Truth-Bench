@@ -69,7 +69,7 @@ AVAILABLE_MODELS: list[ModelInfo] = [
         provider="openai",
         name="GPT-5.1",
         supports_tools=True,
-        supports_web_search=False,
+        supports_web_search=True,
         supports_vision=True,
     ),
     # ==========================================================================

@@ -19,7 +19,7 @@ from collections.abc import AsyncGenerator, Generator
 from typing import Any
 
 import litellm
-from litellm import acompletion, completion
+from litellm import acompletion, aresponses, completion, responses
 
 # xAI SDK for native X search support
 from xai_sdk import Client as XaiClient
@@ -212,22 +212,243 @@ class LLMClient:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = request.tool_choice or "auto"
 
-        # Add web search options if enabled
+        # Add provider-specific web search if enabled
         if request.web_search:
-            model_info = get_model_info(normalized_model)
-            if model_info and model_info.supports_web_search:
-                web_opts = {"search_context_size": "medium"}
-                if request.web_search_options:
-                    web_opts["search_context_size"] = (
-                        request.web_search_options.search_context_size
-                    )
-                kwargs["web_search_options"] = web_opts
-                self.logger.debug(
-                    "Web search enabled",
-                    extra={"model": normalized_model, "options": web_opts},
-                )
+            provider = get_provider_for_model(request.model)
+            self._add_web_search_for_provider(kwargs, request, provider)
 
         return kwargs
+
+    def _add_web_search_for_provider(
+        self,
+        kwargs: dict[str, Any],
+        request: ChatRequest,
+        provider: str | None,
+    ) -> None:
+        """
+        Add provider-specific web search configuration to completion kwargs.
+
+        Each provider has different web search implementations:
+        - xAI: web_search_options parameter
+        - OpenAI: web_search_preview tool in tools array
+        - Anthropic: web_search_20250305 tool with domain filtering
+        - Google: google_search_retrieval grounding tool
+
+        Args:
+            kwargs: Completion kwargs to modify
+            request: Original chat request
+            provider: Provider identifier
+        """
+        if provider == "xai":
+            self._add_xai_web_search(kwargs, request)
+        elif provider == "openai":
+            self._add_openai_web_search(kwargs, request)
+        elif provider == "anthropic":
+            self._add_anthropic_web_search(kwargs, request)
+        elif provider == "google":
+            self._add_google_web_search(kwargs, request)
+        else:
+            self.logger.warning(
+                "Web search requested but provider not supported",
+                extra={"provider": provider, "model": request.model},
+            )
+
+    def _add_xai_web_search(
+        self, kwargs: dict[str, Any], request: ChatRequest
+    ) -> None:
+        """Add xAI web search via web_search_options parameter."""
+        web_opts: dict[str, Any] = {"search_context_size": "medium"}
+        if request.web_search_options:
+            web_opts["search_context_size"] = (
+                request.web_search_options.search_context_size
+            )
+        kwargs["web_search_options"] = web_opts
+        self.logger.debug("xAI web search enabled", extra={"options": web_opts})
+
+    def _add_openai_web_search(
+        self, kwargs: dict[str, Any], request: ChatRequest
+    ) -> None:
+        """
+        OpenAI web search is handled via Responses API, not here.
+
+        This method is a no-op because OpenAI web search requires the
+        Responses API which is handled in _openai_completion_with_web_search.
+        """
+        # OpenAI web search handled via Responses API in separate method
+        self.logger.debug(
+            "OpenAI web search will use Responses API",
+            extra={"model": request.model},
+        )
+
+    async def _openai_completion_with_web_search(
+        self, request: ChatRequest
+    ) -> ChatResponse:
+        """
+        Perform chat completion using OpenAI Responses API with web search.
+
+        OpenAI's web search feature is only available through the Responses API,
+        not the standard Chat Completions API. This method uses LiteLLM's
+        responses() function to access this capability.
+
+        Args:
+            request: Chat completion request with web_search enabled
+
+        Returns:
+            ChatResponse with the model's response
+
+        Raises:
+            Exception: If the completion fails
+        """
+        self.logger.info(
+            "Starting OpenAI Responses API completion with web search",
+            extra={
+                "model": request.model,
+                "message_count": len(request.messages),
+            },
+        )
+
+        # Build input from messages
+        messages_input = self._build_messages(request.messages)
+
+        # Build web search tool configuration
+        context_size = "medium"
+        if request.web_search_options:
+            context_size = request.web_search_options.search_context_size
+
+        tools = [{"type": "web_search_preview", "search_context_size": context_size}]
+
+        # Use LiteLLM's responses API
+        response = await aresponses(
+            model=f"openai/{request.model}" if not request.model.startswith("openai/") else request.model,
+            input=messages_input,
+            tools=tools,
+        )
+
+        self.logger.debug(
+            "OpenAI Responses API response received",
+            extra={
+                "response_type": type(response).__name__,
+                "has_output_text": hasattr(response, "output_text"),
+                "has_output": hasattr(response, "output"),
+            },
+        )
+
+        # Extract output text - LiteLLM Responses API may return in different formats
+        output_text = ""
+        if hasattr(response, "output_text") and response.output_text:
+            output_text = response.output_text
+        elif hasattr(response, "output") and response.output:
+            # Handle output array format
+            for item in response.output:
+                if hasattr(item, "content"):
+                    for content_item in item.content:
+                        if hasattr(content_item, "text"):
+                            output_text += content_item.text
+                elif isinstance(item, dict) and "content" in item:
+                    for content_item in item["content"]:
+                        if isinstance(content_item, dict) and "text" in content_item:
+                            output_text += content_item["text"]
+
+        response_message = ResponseMessage(
+            role="assistant",
+            content=output_text,
+            tool_calls=None,
+        )
+
+        # Parse usage if available
+        usage = None
+        if hasattr(response, "usage") and response.usage:
+            usage = Usage(
+                prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                total_tokens=getattr(response.usage, "total_tokens", 0),
+            )
+
+        # Generate response ID
+        response_id = getattr(response, "id", None) or f"openai-{uuid.uuid4().hex[:8]}"
+
+        self.logger.info(
+            "OpenAI Responses API completion with web search successful",
+            extra={
+                "model": request.model,
+                "response_length": len(output_text),
+            },
+        )
+
+        return ChatResponse(
+            id=response_id,
+            model=request.model,
+            message=response_message,
+            usage=usage,
+            finish_reason="stop",
+        )
+
+    def _add_anthropic_web_search(
+        self, kwargs: dict[str, Any], request: ChatRequest
+    ) -> None:
+        """
+        Add Anthropic web search via web_search_20250305 tool.
+
+        Anthropic's web search supports domain filtering and user location.
+        """
+        max_uses_map = {"low": 2, "medium": 5, "high": 10}
+        max_uses = 5
+
+        web_search_tool: dict[str, Any] = {
+            "type": "web_search_20250305",
+            "name": "web_search",
+        }
+
+        if request.web_search_options:
+            max_uses = max_uses_map.get(
+                request.web_search_options.search_context_size, 5
+            )
+            if request.web_search_options.max_uses:
+                max_uses = request.web_search_options.max_uses
+
+            if request.web_search_options.allowed_domains:
+                web_search_tool["allowed_domains"] = (
+                    request.web_search_options.allowed_domains
+                )
+            if request.web_search_options.blocked_domains:
+                web_search_tool["blocked_domains"] = (
+                    request.web_search_options.blocked_domains
+                )
+
+            if request.web_search_options.user_location:
+                loc = request.web_search_options.user_location
+                web_search_tool["user_location"] = {
+                    "type": loc.type,
+                    "city": loc.city,
+                    "region": loc.region,
+                    "country": loc.country,
+                    "timezone": loc.timezone,
+                }
+
+        web_search_tool["max_uses"] = max_uses
+
+        if "tools" not in kwargs:
+            kwargs["tools"] = []
+        kwargs["tools"].append(web_search_tool)
+        self.logger.debug(
+            "Anthropic web search enabled", extra={"max_uses": max_uses}
+        )
+
+    def _add_google_web_search(
+        self, kwargs: dict[str, Any], request: ChatRequest
+    ) -> None:
+        """
+        Add Google web search via googleSearch tool.
+
+        LiteLLM uses camelCase 'googleSearch' and transforms to Google's snake_case.
+        This enables Grounding with Google Search for Gemini models.
+        """
+        google_search_tool = {"googleSearch": {}}
+
+        if "tools" not in kwargs:
+            kwargs["tools"] = []
+        kwargs["tools"].append(google_search_tool)
+        self.logger.debug("Google Search grounding enabled")
 
     def _parse_response(
         self, response: Any, model: str
@@ -304,6 +525,24 @@ class LLMClient:
 
         provider = get_provider_for_model(request.model)
         return provider == "xai"
+
+    def _should_use_openai_responses(self, request: ChatRequest) -> bool:
+        """
+        Determine if we should use OpenAI Responses API for web search.
+
+        OpenAI web search requires the Responses API, not Chat Completions.
+
+        Args:
+            request: Chat request
+
+        Returns:
+            True if should use OpenAI Responses API
+        """
+        if not request.web_search:
+            return False
+
+        provider = get_provider_for_model(request.model)
+        return provider == "openai"
 
     def _get_xai_model_name(self, model: str) -> str:
         """
@@ -505,8 +744,10 @@ class LLMClient:
         """
         Perform an asynchronous chat completion.
 
-        Routes to xAI SDK when X search is enabled for xAI models,
-        otherwise uses LiteLLM.
+        Routes to specialized APIs based on provider and features:
+        - xAI SDK for X search
+        - OpenAI Responses API for web search
+        - LiteLLM for standard completion
 
         Args:
             request: Chat completion request
@@ -524,6 +765,14 @@ class LLMClient:
                 extra={"model": request.model},
             )
             return await self._xai_completion_with_x_search(request)
+
+        # Route to OpenAI Responses API for web search
+        if self._should_use_openai_responses(request):
+            self.logger.info(
+                "Routing to OpenAI Responses API for web search",
+                extra={"model": request.model},
+            )
+            return await self._openai_completion_with_web_search(request)
 
         # Default: use LiteLLM
         self.logger.info(

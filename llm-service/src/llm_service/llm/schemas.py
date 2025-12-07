@@ -44,12 +44,42 @@ class ToolDefinition(BaseModel):
     function: ToolFunction = Field(description="The function definition")
 
 
+class UserLocation(BaseModel):
+    """User location for localized search results (Anthropic)."""
+
+    type: Literal["approximate"] = Field(
+        default="approximate",
+        description="Type of location (must be 'approximate')",
+    )
+    city: str | None = Field(default=None, description="City name")
+    region: str | None = Field(default=None, description="Region or state")
+    country: str | None = Field(default=None, description="Country code")
+    timezone: str | None = Field(default=None, description="IANA timezone ID")
+
+
 class WebSearchOptions(BaseModel):
-    """Options for web search functionality."""
+    """Options for web search functionality across all providers."""
 
     search_context_size: Literal["low", "medium", "high"] = Field(
         default="medium",
         description="Size of search context: low, medium, or high",
+    )
+    # Anthropic-specific options
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description="Only include results from these domains (Anthropic)",
+    )
+    blocked_domains: list[str] | None = Field(
+        default=None,
+        description="Never include results from these domains (Anthropic)",
+    )
+    max_uses: int | None = Field(
+        default=None,
+        description="Maximum number of searches per request (Anthropic)",
+    )
+    user_location: UserLocation | None = Field(
+        default=None,
+        description="User location for localized results (Anthropic)",
     )
 
 
