@@ -136,7 +136,6 @@ export function useSimulation() {
   const [isPlaying, setIsPlaying] = useState(true);
   const timeRef = useRef(Date.now());
   const initializeModelsOnce = useRef(false);
-  const seedEventsOnce = useRef(false);
 
   // Mutations - must be created unconditionally at hook level
   const updateModelMutation = useMutation({
@@ -226,14 +225,6 @@ export function useSimulation() {
     }
   }, [apiModels]);
 
-  // Seed 100 example events on initialization
-  useEffect(() => {
-    if (!seedEventsOnce.current) {
-      seedEventsOnce.current = true;
-      fetch('/api/events/seed', { method: 'POST' }).catch(() => {});
-    }
-  }, []);
-
   // Set local state when API data loads
   useEffect(() => {
     if (apiModels?.length) {
@@ -267,7 +258,6 @@ export function useSimulation() {
     }
   }, [marketState]);
 
-  // Update models every second
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -310,42 +300,34 @@ export function useSimulation() {
         return updated;
       });
 
+      if (Math.random() > 0.6) {
+        const randomModel = Object.values(MODELS_CONFIG)[Math.floor(Math.random() * 6)];
+        const market = MARKETS[Math.floor(Math.random() * MARKETS.length)];
+        const isBullish = Math.random() > 0.5;
+        const type = isBullish ? 'bullish' : 'bearish';
+        const action = isBullish ? 'Buy' : 'Sell';
+        const comment = COMMENTS[type][Math.floor(Math.random() * COMMENTS[type].length)];
+        const tradeAmount = Math.floor(Math.random() * 45000) + 5000;
+
+        setLocalTotalVolume(prev => {
+          const newVolume = prev + tradeAmount;
+          updateStateMutation.mutate({ totalVolume: newVolume });
+          return newVolume;
+        });
+
+        createEventMutation.mutate({
+          modelId: randomModel.id as ModelId,
+          market,
+          action,
+          comment,
+          timestamp: now
+        });
+      }
+
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, updateModelMutation]);
-
-  // Cycle through random events from database every 2.5 seconds and simulate volume
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const fetchRandomEvents = async () => {
-      try {
-        const res = await fetch('/api/events/random?limit=5');
-        if (res.ok) {
-          const events = await res.json();
-          if (events.length > 0) {
-            setLocalEvents(events);
-            const tradeAmount = Math.floor(Math.random() * 45000) + 5000;
-            setLocalTotalVolume(prev => {
-              const newVolume = prev + tradeAmount;
-              updateStateMutation.mutate({ totalVolume: newVolume });
-              return newVolume;
-            });
-          }
-        }
-      } catch (e) {
-        // Ignore fetch errors
-      }
-    };
-
-    // Initial fetch
-    fetchRandomEvents();
-
-    const interval = setInterval(fetchRandomEvents, 2500);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, updateStateMutation]);
+  }, [isPlaying, updateModelMutation, createEventMutation, updateStateMutation]);
 
   return { models: localModels, events: localEvents, totalVolume: localTotalVolume, isPlaying, setIsPlaying };
 }
