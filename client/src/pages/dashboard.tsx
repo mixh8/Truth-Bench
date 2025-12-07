@@ -20,7 +20,7 @@ export default function Dashboard() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="space-y-1">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">AlphaBench</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Truth Bench</h1>
                     <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 animate-pulse">
                         LIVE
                     </Badge>
