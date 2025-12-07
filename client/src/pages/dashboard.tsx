@@ -1,5 +1,4 @@
 import { useSimulation } from "@/lib/simulation";
-import { Ticker } from "@/components/dashboard/Ticker";
 import { Leaderboard } from "@/components/dashboard/Leaderboard";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { ReasoningFeed } from "@/components/dashboard/ReasoningFeed";
@@ -47,8 +46,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <Ticker />
-      
       <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
