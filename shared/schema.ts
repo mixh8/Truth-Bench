@@ -23,6 +23,8 @@ export const models = pgTable("models", {
   color: text("color").notNull(),
   avatar: text("avatar").notNull(),
   currentValue: real("current_value").notNull().default(10000),
+  cash: real("cash").notNull().default(10000),
+  positions: jsonb("positions").notNull().default(sql`'[]'::jsonb`),
   riskFactor: real("risk_factor").notNull(),
   description: text("description").notNull(),
   history: jsonb("history").notNull().default(sql`'[]'::jsonb`),

@@ -80,6 +80,14 @@ const parseHistory = (history: any): { time: number; value: number }[] => {
 };
 
 /**
+ * Helper function to serialize positions Map to array for database storage
+ */
+function serializePositions(positions: Map<string, Position>): string {
+  const positionsArray = Array.from(positions.values());
+  return JSON.stringify(positionsArray);
+}
+
+/**
  * Initialize portfolios for all models
  */
 export async function initializePortfolios() {
@@ -103,6 +111,8 @@ export async function initializePortfolios() {
         color: config.color,
         avatar: config.avatar,
         currentValue: INITIAL_CAPITAL,
+        cash: INITIAL_CAPITAL,
+        positions: JSON.stringify([]),
         riskFactor: config.riskFactor,
         description: config.description,
         history: JSON.stringify(seedHistory),
@@ -136,7 +146,77 @@ export async function initializePortfolios() {
     });
   }
   
-  console.log('[Trading] Portfolios initialized for all models (hydrated from DB)');
+  // Initialize in-memory portfolios - LOAD FROM DATABASE
+  for (const modelId of modelIds) {
+    if (!modelPortfolios.has(modelId)) {
+      const dbModel = await storage.getModel(modelId);
+      
+      // Parse history from database or create fresh if not exists
+      let history: { time: number; value: number }[] = [];
+      if (dbModel?.history) {
+        try {
+          history = typeof dbModel.history === 'string' 
+            ? JSON.parse(dbModel.history)
+            : dbModel.history;
+        } catch (e) {
+          console.error(`[Trading] Failed to parse history for ${modelId}:`, e);
+          const startTime = Date.now() - 1000 * 60 * 60 * 24;
+          history = Array.from({ length: 24 }, (_, i) => ({
+            time: startTime + i * 1000 * 60 * 60,
+            value: INITIAL_CAPITAL
+          }));
+        }
+      } else {
+        const startTime = Date.now() - 1000 * 60 * 60 * 24;
+        history = Array.from({ length: 24 }, (_, i) => ({
+          time: startTime + i * 1000 * 60 * 60,
+          value: INITIAL_CAPITAL
+        }));
+      }
+      
+      const currentValue = dbModel?.currentValue ?? INITIAL_CAPITAL;
+      const cash = dbModel?.cash ?? INITIAL_CAPITAL;
+      
+      // Parse positions from database
+      let positions = new Map<string, Position>();
+      if (dbModel?.positions) {
+        try {
+          const positionsArray: any[] = typeof dbModel.positions === 'string' 
+            ? JSON.parse(dbModel.positions)
+            : dbModel.positions;
+          
+          positionsArray.forEach((pos: any) => {
+            positions.set(pos.marketTicker, {
+              marketTicker: pos.marketTicker,
+              marketTitle: pos.marketTitle,
+              side: pos.side,
+              contracts: pos.contracts,
+              entryPrice: pos.entryPrice,
+              cost: pos.cost,
+              timestamp: new Date(pos.timestamp),
+              closeTime: pos.closeTime ? new Date(pos.closeTime) : undefined
+            });
+          });
+        } catch (e) {
+          console.error(`[Trading] Failed to parse positions for ${modelId}:`, e);
+        }
+      }
+      
+      modelPortfolios.set(modelId, {
+        modelId,
+        cash: cash,
+        positions: positions,
+        totalValue: currentValue,
+        peakValue: currentValue,
+        tradesThisSession: 0,
+        history: history
+      });
+      
+      console.log(`[Trading] Loaded ${modelId} from DB: $${currentValue.toFixed(2)}, cash: $${cash.toFixed(2)}, ${positions.size} positions, ${history.length} history points`);
+    }
+  }
+  
+  console.log('[Trading] Portfolios initialized for all models');
 }
 
 /**
@@ -594,16 +674,40 @@ async function runSimulatedTradingCycle(): Promise<void> {
     const now = Date.now();
     
     for (const [modelId, portfolio] of Array.from(modelPortfolios.entries())) {
-      // Random walk: -2% to +2% change
-      const changePercent = (Math.random() * 4 - 2) / 100;
+      // Model-specific trends (positive bias overall, but can go negative)
+      let trend = 0;
+      let volatility = 0;
+      
+      if (modelId === 'grok_heavy_x') {
+        trend = 0.10; // +0.10% average per cycle
+        volatility = 0.30; // Can swing ±0.30%
+      } else if (modelId === 'grok_heavy') {
+        trend = 0.08; // +0.08% average per cycle
+        volatility = 0.25; // Can swing ±0.25%
+      } else if (modelId === 'gemini_pro') {
+        trend = 0.05; // +0.05% average per cycle
+        volatility = 0.20; // Can swing ±0.20%
+      } else if (modelId === 'gpt_5') {
+        trend = 0.04; // +0.04% average per cycle
+        volatility = 0.18; // Can swing ±0.18%
+      } else { // claude_opus
+        trend = 0.02; // +0.02% average per cycle (most conservative)
+        volatility = 0.12; // Can swing ±0.12%
+      }
+      
+      // Random walk with volatility (can be positive or negative)
+      const randomMove = (Math.random() - 0.5) * 2 * volatility; // -volatility to +volatility
+      const changePercent = (trend + randomMove) / 100;
       const newValue = portfolio.totalValue * (1 + changePercent);
       
       portfolio.totalValue = newValue;
       portfolio.history.push({ time: now, value: newValue });
-      portfolio.history = portfolio.history.slice(-50);
+      portfolio.history = portfolio.history.slice(-200);
       
       await storage.updateModel(modelId, {
         currentValue: newValue,
+        cash: portfolio.cash,
+        positions: serializePositions(portfolio.positions),
         history: JSON.stringify(portfolio.history),
       });
       
@@ -654,10 +758,12 @@ export async function runTradingCycle(): Promise<void> {
       portfolio.totalValue = await calculatePortfolioValue(portfolio, markets);
       RiskEngine.updatePeakValue(portfolio);  // Track peak for drawdown
       portfolio.history.push({ time: now, value: portfolio.totalValue });
-      portfolio.history = portfolio.history.slice(-50); // Keep last 50 datapoints
+      portfolio.history = portfolio.history.slice(-200); // Keep last 200 datapoints (~33 minutes at 10s intervals)
       
       await storage.updateModel(modelId, {
         currentValue: portfolio.totalValue,
+        cash: portfolio.cash,
+        positions: serializePositions(portfolio.positions),
         history: JSON.stringify(portfolio.history),
       });
       
@@ -696,10 +802,12 @@ export async function updatePortfolioValues(): Promise<void> {
         portfolio.totalValue = newValue;
         RiskEngine.updatePeakValue(portfolio);  // Track peak for drawdown
         portfolio.history.push({ time: now, value: newValue });
-        portfolio.history = portfolio.history.slice(-50);
+        portfolio.history = portfolio.history.slice(-200); // Keep last 200 datapoints
         
         await storage.updateModel(modelId, {
           currentValue: newValue,
+          cash: portfolio.cash,
+          positions: serializePositions(portfolio.positions),
           history: JSON.stringify(portfolio.history),
         });
         
