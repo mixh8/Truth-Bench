@@ -1,10 +1,33 @@
 """Twitter augmentation for Kalshi market data."""
 
 import os
+import re
 import requests
 from datetime import datetime, timedelta
 from collections import Counter
 from urllib.parse import urlparse
+
+# Simple stopword list to keep queries tight and market-relevant
+STOPWORDS = {
+    'the', 'a', 'an', 'of', 'for', 'and', 'in', 'on', 'to', 'is', 'will', 'at',
+    'by', 'with', 'who', 'what', 'when', 'where', 'why', 'how', 'vs', 'or',
+    'be', 'are', 'this', 'that', 'from', 'as', 'about', 'into', 'over', 'under',
+    'pro', 'next', 'winner', 'win', 'wins', 'won', 'lose', 'loses', 'loss'
+}
+
+
+def build_event_keywords(title_clean, category, series_ticker=None):
+    """Keep only meaningful words from a title."""
+    tokens = re.findall(r"[A-Za-z0-9']+", title_clean)
+    keywords = []
+    for token in tokens:
+        low = token.lower()
+        if len(low) < 3 and not (token.isupper() and 2 <= len(token) <= 4):
+            continue
+        if low in STOPWORDS:
+            continue
+        keywords.append(token)
+    return keywords[:10]
 
 
 def augment_kalshi_with_twitter(kalshi_feed_data, x_api_key=None):
@@ -55,8 +78,20 @@ def augment_kalshi_with_twitter(kalshi_feed_data, x_api_key=None):
         
         print(f"Fetching Twitter data for event: {series_title}...")
         
-        # Get Twitter data ONCE per event (not per market)
-        twitter_data = get_twitter_metrics_for_event(series_title, category, x_api_key)
+        # Collect market-specific questions (yes_subtitle) for tighter queries
+        market_questions = []
+        for market in series.get('markets', []):
+            q = market.get('yes_subtitle') or market.get('market_title') or market.get('title')
+            if q:
+                market_questions.append(q)
+        
+        # Get Twitter data using market questions (not tickers)
+        twitter_data = get_twitter_metrics_for_event(
+            event_title=series_title,
+            category=category,
+            x_api_key=x_api_key,
+            market_questions=market_questions
+        )
         
         # Store at series level, not individual market level
         augmented_data['twitter_augmentation'][series_ticker] = {
@@ -82,7 +117,7 @@ def augment_kalshi_with_twitter(kalshi_feed_data, x_api_key=None):
     return augmented_data
 
 
-def get_twitter_metrics_for_event(event_title, category, x_api_key):
+def get_twitter_metrics_for_event(event_title, category, x_api_key, market_questions=None, series_ticker=None):
     """
     Get Twitter metrics for a specific event using X API.
     
@@ -94,23 +129,38 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
     Returns:
         Dict with Twitter metrics
     """
-    # Build search query based on event title and category
+    # Build search query based on market questions (preferred) or event title
     # Clean up the title (remove question marks, etc.)
     title_clean = event_title.replace('?', '').strip()
+    market_questions = market_questions or []
     
-    # Build contextual query
-    query = f'"{title_clean}" -is:retweet lang:en'
+    # Build query as OR of up to 4 sub-market questions, each paired with the event title,
+    # plus a looser OR of the options and the event title alone (helps avoid empty results)
+    cleaned_questions = []
+    for q in market_questions:
+        q_clean = q.replace('?', '').strip()
+        if q_clean:
+            cleaned_questions.append(q_clean)
+    selected_questions = cleaned_questions[:4]
+    keywords = selected_questions if selected_questions else ([title_clean] if title_clean else [])
     
-    # Add category-specific keywords if relevant
-    if 'election' in category.lower() or 'election' in title_clean.lower():
-        query = f'({title_clean} OR election OR vote OR campaign) -is:retweet lang:en'
-    elif 'weather' in category.lower() or 'temperature' in title_clean.lower():
-        query = f'({title_clean} OR weather OR forecast) -is:retweet lang:en'
-    elif 'sports' in category.lower():
-        query = f'({title_clean} OR game OR match OR championship) -is:retweet lang:en'
+    combined_clauses = []
+    if title_clean:
+        for q in selected_questions:
+            combined_clauses.append(f'"{title_clean}" "{q}"')
+        # also include the event title alone as a broad catch
+        combined_clauses.append(f'"{title_clean}"')
     else:
-        # Default: just use the title
-        query = f'"{title_clean}" -is:retweet lang:en'
+        combined_clauses = [f'"{q}"' for q in selected_questions]
+    
+    # Add a loose OR of the options themselves
+    options_or = " OR ".join([f'"{q}"' for q in selected_questions]) if selected_questions else ''
+    
+    clauses = [c for c in combined_clauses + ([options_or] if options_or else []) if c]
+    query_body = " OR ".join(clauses) if clauses else title_clean
+    query = f'({query_body}) -is:retweet lang:en'
+    fallback_query = None
+    print(f"[twitter_augmentation] event='{event_title}' primary='{selected_questions[:1]}' query='{query}' phrases={selected_questions}")
     
     # X API endpoint
     url = "https://api.twitter.com/2/tweets/search/recent"
@@ -120,23 +170,27 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
         "Content-Type": "application/json"
     }
     
-    params = {
-        "query": query,
-        "max_results": 100,  # Max allowed per request
-        "tweet.fields": "created_at,public_metrics,author_id,entities",
-        "user.fields": "username,verified,public_metrics",
-        "expansions": "author_id"
-    }
-    
-    try:
+    def _run_query(q):
+        params = {
+            "query": q,
+            "max_results": 100,  # Max allowed per request
+            "tweet.fields": "created_at,public_metrics,author_id,entities",
+            "user.fields": "username,verified,public_metrics",
+            "expansions": "author_id"
+        }
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        data = response.json()
+        return response.json()
+    
+    api_calls = 0
+    try:
+        data = _run_query(query)
+        api_calls += 1
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Twitter data: {e}")
         return {
             'error': str(e),
-            '_api_calls': 1
+            '_api_calls': api_calls or 1
         }
     
     # Extract tweets and users
@@ -144,12 +198,33 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
     users_list = data.get('includes', {}).get('users', [])
     users = {user['id']: user for user in users_list}
     
+    # Fallback: if empty and we have options or title, retry with looser OR
+    if not tweets and (options_or or title_clean):
+        fallback_parts = []
+        if title_clean:
+            fallback_parts.append(f'"{title_clean}"')
+        if options_or:
+            fallback_parts.append(options_or)
+        if fallback_parts:
+            fallback_query = f'({" OR ".join(fallback_parts)}) -is:retweet lang:en'
+            print(f"[twitter_augmentation] fallback query='{fallback_query}'")
+            try:
+                data = _run_query(fallback_query)
+                api_calls += 1
+                tweets = data.get('data', [])
+                users_list = data.get('includes', {}).get('users', [])
+                users = {user['id']: user for user in users_list}
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching Twitter data (fallback): {e}")
+    
     if not tweets:
         return {
             'total_tweets': 0,
             'message': 'No tweets found',
             'search_query': query,
-            '_api_calls': 1
+            'fallback_query': fallback_query,
+            'relevance_filter_keywords': keywords,
+            '_api_calls': api_calls or 1
         }
     
     # Calculate metrics
@@ -239,8 +314,8 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
         
         # Hashtags
         hashtags = entities.get('hashtags', [])
-        for tag in hashtags:
-            all_hashtags.append(tag.get('tag', '').lower())
+        tweet_hashtags = [tag.get('tag', '').lower() for tag in hashtags if tag.get('tag')]
+        all_hashtags.extend(tweet_hashtags)
         
         # Store tweet for top tweets
         tweet_data.append({
@@ -251,6 +326,7 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
             'author_followers': followers,
             'created_at': tweet['created_at'],
             'hours_ago': (now - created_at).total_seconds() / 3600,
+            'hashtags': tweet_hashtags,
             'engagement': {
                 'likes': likes,
                 'retweets': retweets,
@@ -260,8 +336,28 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
             'url': f"https://twitter.com/{author.get('username', 'i')}/status/{tweet['id']}"
         })
     
-    # Sort tweets by engagement and take top 10
-    top_tweets = sorted(tweet_data, key=lambda x: x['engagement']['total'], reverse=True)[:10]
+    # Relevance filter: keep tweets mentioning keywords or matching hashtags
+    keyword_matchers = {kw.lower() for kw in keywords}
+    def _is_relevant(tweet):
+        text_lower = tweet['text'].lower()
+        if any(kw in text_lower for kw in keyword_matchers):
+            return True
+        if any(ht in keyword_matchers for ht in tweet.get('hashtags', [])):
+            return True
+        return False
+    
+    relevant_tweets = [t for t in tweet_data if _is_relevant(t)]
+    relevance_applied = True
+    if not relevant_tweets:
+        relevant_tweets = tweet_data  # fallback to avoid empty results
+        relevance_applied = False
+    
+    # Sort relevant tweets by engagement with light recency bonus
+    def _rank_score(t):
+        recency_bonus = max(0, 48 - t['hours_ago']) * 0.5  # favor fresher tweets
+        return t['engagement']['total'] + recency_bonus
+    
+    top_tweets = sorted(relevant_tweets, key=_rank_score, reverse=True)[:10]
     
     # Calculate derived metrics
     total_tweets = len(tweets)
@@ -275,7 +371,11 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
     velocity_change = ((tweet_velocity_24h - tweet_velocity_7d) / tweet_velocity_7d) if tweet_velocity_7d > 0 else 0
     
     # Top hashtags
-    hashtag_counts = Counter(all_hashtags)
+    relevant_hashtags = []
+    for t in relevant_tweets:
+        relevant_hashtags.extend(t.get('hashtags', []))
+    hashtag_source = relevant_hashtags if relevant_hashtags else all_hashtags
+    hashtag_counts = Counter(hashtag_source)
     top_hashtags = [{'tag': tag, 'count': count} for tag, count in hashtag_counts.most_common(10)]
     
     # News domains (filter for known news sites)
@@ -329,10 +429,14 @@ def get_twitter_metrics_for_event(event_title, category, x_api_key):
         
         # Hashtags
         'top_hashtags': top_hashtags,
+        'relevant_tweets_considered': len(relevant_tweets),
+        'relevance_filter_applied': relevance_applied,
+        'relevance_filter_keywords': keywords,
         
         # Meta
         'last_updated': datetime.utcnow().isoformat() + 'Z',
         'search_query': query,
+        'fallback_query': fallback_query,
         'api_used': 'search_recent',
-        '_api_calls': 1
+        '_api_calls': api_calls
     }
