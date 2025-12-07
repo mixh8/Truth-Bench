@@ -357,7 +357,32 @@ async function executeTrade(
     }
     
     const price = (side === 'YES' ? market.yesPrice : market.noPrice) / 100;
-    const contracts = RISK_PARAMS.POSITION_SIZE_CONTRACTS;
+    if (price <= 0) {
+      console.log(`[Trading] ${modelId} skipping ${ticker} - invalid price ${price}`);
+      return;
+    }
+
+    // Dollar-based sizing: aim for target % of portfolio, capped by absolute limit and cash after reserve
+    const targetByPct = portfolio.totalValue * RISK_PARAMS.TARGET_POSITION_SIZE_PCT;
+    const maxByPct = portfolio.totalValue * RISK_PARAMS.MAX_POSITION_SIZE_PCT;
+    const maxAffordableDollars = Math.max(0, portfolio.cash - RISK_PARAMS.MIN_CASH_RESERVE);
+    const targetValue = Math.min(targetByPct, maxByPct, RISK_PARAMS.MAX_POSITION_VALUE_DOLLARS, maxAffordableDollars);
+
+    if (targetValue <= 0) {
+      console.log(`[Trading] ${modelId} skipping ${ticker} - insufficient cash after reserve`);
+      return;
+    }
+
+    const costPerContract = RiskEngine.calculatePositionCost(price, 1);
+    const maxAffordableContracts = Math.floor(maxAffordableDollars / costPerContract);
+    let contracts = Math.floor(targetValue / price);
+    contracts = Math.min(contracts, maxAffordableContracts);
+
+    if (contracts <= 0) {
+      console.log(`[Trading] ${modelId} skipping ${ticker} - cannot afford even 1 contract after reserve`);
+      return;
+    }
+
     const cost = RiskEngine.calculatePositionCost(price, contracts);
     
     // Run risk checks
@@ -385,7 +410,7 @@ async function executeTrade(
     console.log(`\n💵 [TRADE EXECUTED] ${modelId} BOUGHT ${contracts} ${side} contracts`);
     console.log(`   Market: ${market.title}`);
     console.log(`   Entry Price: ${(price * 100).toFixed(1)}¢ ($${price.toFixed(3)}/contract)`);
-    console.log(`   Total Cost: $${cost.toFixed(2)}`);
+    console.log(`   Sized To: $${targetValue.toFixed(2)} target (post-fee cost $${cost.toFixed(2)})`);
     console.log(`   Confidence: ${confidence}%`);
     console.log(`   Reasoning: ${reasoning.slice(0, 100)}...`);
     console.log(`   Cash Remaining: $${portfolio.cash.toFixed(2)}\n`);

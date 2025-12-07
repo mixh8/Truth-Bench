@@ -11,7 +11,10 @@ import type { ModelId } from "./tradingSimulation";
 export const RISK_PARAMS = {
   // Position limits
   MAX_POSITION_PER_MARKET: 1,              // Max 1 position per market (per model)
-  POSITION_SIZE_CONTRACTS: 100,            // Fixed position size
+  
+  // Position sizing (dollar-based)
+  TARGET_POSITION_SIZE_PCT: 0.10,          // Aim for 10% of portfolio per new position
+  MAX_POSITION_VALUE_DOLLARS: 1500,        // Hard cap per position in dollars
   
   // Capital management
   MIN_CASH_RESERVE: 500,                   // Always keep at least $500 in cash
