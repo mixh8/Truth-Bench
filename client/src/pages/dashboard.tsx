@@ -2,7 +2,7 @@ import { useSimulation } from "@/lib/simulation";
 import { Ticker } from "@/components/dashboard/Ticker";
 import { Leaderboard } from "@/components/dashboard/Leaderboard";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
-import { ModelStream } from "@/components/dashboard/ModelStream";
+import { ReasoningFeed } from "@/components/dashboard/ReasoningFeed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RefreshCw } from "lucide-react";
@@ -72,7 +72,7 @@ export default function Dashboard() {
             <div className="lg:col-span-1 flex flex-col gap-6 h-full">
                 <Leaderboard models={models} />
                 <div className="flex-1 min-h-0">
-                    <ModelStream events={events} />
+                    <ReasoningFeed events={events} />
                 </div>
             </div>
         </div>
