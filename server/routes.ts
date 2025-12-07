@@ -136,5 +136,27 @@ export async function registerRoutes(
     }
   });
 
+  // Admin endpoint to manually seed trades (for production database)
+  app.post("/api/admin/seed", async (req, res) => {
+    try {
+      console.log("[Admin] Manual seed requested...");
+      await seedTrades();
+      const events = await storage.getAllEventsOrdered();
+      res.json({ 
+        success: true, 
+        message: `Database seeded successfully with ${events.length} trades`,
+        count: events.length
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("[Admin] Seed failed:", errorMessage);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to seed database",
+        details: errorMessage
+      });
+    }
+  });
+
   return httpServer;
 }
