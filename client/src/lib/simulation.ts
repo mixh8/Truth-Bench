@@ -32,7 +32,7 @@ export const INITIAL_CAPITAL = 10000;
 export const MODELS_CONFIG: Record<ModelId, Omit<Model, 'currentValue' | 'history'>> = {
   grok_heavy_x: {
     id: 'grok_heavy_x',
-    name: 'Grok 4 Heavy w/ X',
+    name: 'Grok w/ X',
     color: 'hsl(var(--color-model-grok-x))',
     avatar: '🌌',
     riskFactor: 0.9,
