@@ -5,7 +5,14 @@
  * the Python llm-service backend.
  */
 
-const LLM_SERVICE_URL = 'http://localhost:8000';
+// Allow overriding the backend; trim trailing slashes to avoid // in URLs.
+// In production with no override, fall back to relative paths so Vercel rewrites
+// can proxy to the Render backend without CORS.
+const rawServiceUrl =
+  import.meta.env.VITE_LLM_SERVICE_URL ??
+  (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8000');
+
+const LLM_SERVICE_URL = rawServiceUrl.replace(/\/+$/, '');
 
 // ============================================================================
 // Types matching Python schemas (llm_service/llm/schemas.py)

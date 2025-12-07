@@ -35,6 +35,9 @@ from llm_service.llm.schemas import (
 from kalshi.client import scrape_kalshi_feed
 from kalshi.twitter_augmentation import augment_kalshi_with_twitter
 
+# Import TruthBench API router
+from truthbench.api import router as truthbench_router, set_llm_client as set_truthbench_client
+
 # Global instances
 _llm_client: LLMClient | None = None
 _logger: logging.Logger | None = None
@@ -86,6 +89,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize LLM client
     _llm_client = LLMClient(settings)
     _logger.info("LLM client initialized")
+    
+    # Set LLM client for TruthBench
+    set_truthbench_client(_llm_client)
+    _logger.info("TruthBench client configured")
 
     yield
 
@@ -110,6 +117,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include TruthBench router
+app.include_router(truthbench_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
