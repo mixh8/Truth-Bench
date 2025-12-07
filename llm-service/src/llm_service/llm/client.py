@@ -89,6 +89,8 @@ class LLMClient:
         if self.settings.google_api_key:
             os.environ["GOOGLE_API_KEY"] = self.settings.google_api_key
             self.logger.debug("Google API key configured")
+        else:
+            self.logger.warning("Google API key missing; Gemini calls will fail")
 
     def _normalize_model_name(self, model: str) -> str:
         """

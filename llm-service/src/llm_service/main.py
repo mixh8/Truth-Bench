@@ -263,7 +263,8 @@ class ModelPrediction(BaseModel):
     """Individual model's prediction."""
     model_id: str
     name: str
-    vote: str  # "YES" or "NO"
+    vote: str  # "YES" or "NO" (legacy yes/no compatibility)
+    predicted_outcome: str  # Exact label of the outcome the model picked
     confidence: int  # 0-100
     reasoning: str
     timestamp: str

@@ -257,6 +257,7 @@ export interface ModelPrediction {
   model_id: string;
   name: string;
   vote: "YES" | "NO";
+  predicted_outcome?: string;
   confidence: number;
   reasoning: string;
   timestamp: string;
@@ -283,6 +284,9 @@ export interface MarketAnalysisResponse {
     no_count: number;
     avg_confidence: number;
     is_strong: boolean;
+    predicted_outcome?: string;
+    predicted_outcome_ticker?: string;
+    votes_for_outcome?: number;
   };
   metadata: {
     analyzed_at: string;

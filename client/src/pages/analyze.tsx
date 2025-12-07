@@ -235,6 +235,14 @@ const ModelIcon = ({ id, className }: { id: string; className?: string }) => {
   }
 };
 
+const modelShortName = (id: string, name: string) => {
+  if (id === 'grok-beta-x') return 'Grok w/ X';
+  if (id === 'grok-beta') return 'Grok';
+  if (id === 'grok_heavy_x') return 'Grok w/ X';
+  if (id === 'grok_heavy') return 'Grok';
+  return name.split(' ')[0];
+};
+
 function MarketCard({ market, isSelected, onClick }: { market: Market; isSelected: boolean; onClick: () => void }) {
   return (
     <div 
@@ -282,7 +290,7 @@ function MarketCard({ market, isSelected, onClick }: { market: Market; isSelecte
   );
 }
 
-function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: { market: Market; votes: ModelVote[]; tweets: XTweet[]; twitterMetrics?: TwitterMetrics | null; isAnalyzing?: boolean }) {
+function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing, consensusOutcomeLabel, consensusOutcomeTicker }: { market: Market; votes: ModelVote[]; tweets: XTweet[]; twitterMetrics?: TwitterMetrics | null; isAnalyzing?: boolean; consensusOutcomeLabel?: string | null; consensusOutcomeTicker?: string | null }) {
   const [contracts, setContracts] = useState(10);
   
   const analysis = useMemo(() => {
@@ -301,15 +309,14 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
   }, [votes]);
 
   const generateConsensusText = () => {
-    const bullish = analysis.recommendation === 'YES';
-    const yesModels = votes.filter(v => v.vote === 'YES').map(v => v.name.split(' ')[0]);
-    const noModels = votes.filter(v => v.vote === 'NO').map(v => v.name.split(' ')[0]);
+    const bullish = recommendedIsYes;
+    const yesModels = votes.filter(v => v.vote === 'YES').map(v => modelShortName(v.id, v.name));
+    const noModels = votes.filter(v => v.vote === 'NO').map(v => modelShortName(v.id, v.name));
     
     if (bullish) {
-      return `The consensus is bullish. **${yesModels.slice(0, 2).join('** and **')}** highlight strong momentum indicators${noModels.length > 0 ? `, while **${noModels[0]}** advises caution due to macro headwinds` : ''}. With ${analysis.yesCount} out of 6 models voting YES, the aggregate signal suggests an undervaluation of the 'YES' contract at current pricing.`;
-    } else {
-      return `The consensus is bearish. **${noModels.slice(0, 2).join('** and **')}** identify significant risk factors${yesModels.length > 0 ? `, though **${yesModels[0]}** sees potential upside` : ''}. With ${analysis.noCount} out of 6 models voting NO, the aggregate signal suggests the 'NO' position offers better risk-adjusted returns.`;
+      return `The consensus favors **${outcomeLabel}**. **${yesModels.slice(0, 2).join('** and **')}** highlight strong momentum indicators${noModels.length > 0 ? `, while **${noModels[0]}** advises caution due to macro headwinds` : ''}. With ${analysis.yesCount} out of ${votes.length || 6} models voting YES, the aggregate signal suggests an undervaluation at current pricing.`;
     }
+    return `The consensus prefers **${outcomeLabel}** over the primary contract. **${noModels.slice(0, 2).join('** and **')}** identify significant risk factors${yesModels.length > 0 ? `, though **${yesModels[0]}** sees potential upside` : ''}. With ${analysis.noCount} out of ${votes.length || 6} models voting NO, the aggregate signal suggests the alternative outcome offers better risk-adjusted returns.`;
   };
 
   const keyFactors = useMemo(() => {
@@ -320,7 +327,13 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
     return factors;
   }, [votes, analysis.recommendation]);
 
-  const contractPrice = analysis.recommendation === 'YES' ? market.yesPrice : market.noPrice;
+  const outcomeLabel = consensusOutcomeLabel || market.yesLabel;
+  const outcomeTicker = consensusOutcomeTicker || market.ticker;
+  const outcomeMatch = market.allOutcomes?.find(
+    o => o.ticker?.toLowerCase() === outcomeTicker?.toLowerCase() || o.label === outcomeLabel
+  );
+  const recommendedIsYes = !market.allOutcomes || outcomeLabel === market.yesLabel;
+  const contractPrice = outcomeMatch?.price ?? (analysis.recommendation === 'YES' ? market.yesPrice : market.noPrice);
   const estCost = (contracts * contractPrice / 100).toFixed(2);
 
   return (
@@ -349,7 +362,7 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
 
         <div className={cn(
           "rounded-xl p-6 border-2 relative",
-          analysis.recommendation === 'YES' 
+          recommendedIsYes 
             ? "bg-gradient-to-br from-emerald-950/50 to-slate-900 border-emerald-500/40" 
             : "bg-gradient-to-br from-rose-950/50 to-slate-900 border-rose-500/40"
         )}>
@@ -364,7 +377,7 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
           <div className="flex items-center gap-2 mb-1">
             <Activity className={cn(
               "w-5 h-5",
-              analysis.recommendation === 'YES' ? "text-emerald-400" : "text-rose-400"
+              recommendedIsYes ? "text-emerald-400" : "text-rose-400"
             )} />
             <span className="text-sm font-semibold text-slate-300">TruthBench Consensus</span>
             {!isAnalyzing && votes.length > 0 && (
@@ -377,9 +390,9 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
             <div>
               <div className={cn(
                 "text-3xl font-bold",
-                analysis.recommendation === 'YES' ? "text-emerald-400" : "text-rose-400"
+                recommendedIsYes ? "text-emerald-400" : "text-rose-400"
               )}>
-                BUY {analysis.recommendation}
+                BUY {outcomeLabel}
               </div>
               <div className="text-sm text-slate-400 mt-1">
                 {analysis.yesCount} YES / {analysis.noCount} NO votes
@@ -432,7 +445,7 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
                 data-testid={`vote-badge-${vote.id}`}
               >
                 <ModelIcon id={vote.id} className="w-4 h-4 text-slate-400" />
-                <span className="text-xs text-slate-300 flex-1 truncate">{vote.id === 'grok_heavy_x' ? 'Grok w/ X' : vote.name.split(' ')[0]}</span>
+                <span className="text-xs text-slate-300 flex-1 truncate">{modelShortName(vote.id, vote.name)}</span>
                 {vote.vote === 'YES' ? (
                   <CheckCircle className="w-4 h-4 text-emerald-400" />
                 ) : (
@@ -649,13 +662,13 @@ function ConsensusPanel({ market, votes, tweets, twitterMetrics, isAnalyzing }: 
         <Button 
           className={cn(
             "w-full h-12 font-semibold text-base gap-2",
-            analysis.recommendation === 'YES'
+          recommendedIsYes
               ? "bg-emerald-600 hover:bg-emerald-500 text-white"
               : "bg-rose-600 hover:bg-rose-500 text-white"
           )}
           data-testid="button-execute"
         >
-          Execute BUY {analysis.recommendation}
+        Execute BUY {outcomeLabel}
           <ArrowRight className="w-5 h-5" />
         </Button>
       </div>
@@ -789,6 +802,9 @@ export default function Analyze() {
     reasoning: pred.reasoning,
   })) || MODEL_VOTES[selectedMarketId] || [];
 
+  const consensusOutcomeLabel = analysisData?.consensus?.predicted_outcome || null;
+  const consensusOutcomeTicker = analysisData?.consensus?.predicted_outcome_ticker || null;
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
@@ -849,6 +865,8 @@ export default function Analyze() {
             tweets={X_TWEETS[selectedMarketId] || []}
             twitterMetrics={selectedTwitter}
             isAnalyzing={isAnalyzing}
+            consensusOutcomeLabel={consensusOutcomeLabel}
+            consensusOutcomeTicker={consensusOutcomeTicker}
           />
         </main>
       </div>
