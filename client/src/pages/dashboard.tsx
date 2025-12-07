@@ -5,14 +5,48 @@ import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { ReasoningFeed } from "@/components/dashboard/ReasoningFeed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RefreshCw } from "lucide-react";
+import { Play, Pause, RefreshCw, LayoutDashboard, FileText } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const { models, events, totalVolume, isPlaying, setIsPlaying } = useSimulation();
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
+      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center gap-6">
+              <span className="text-lg font-bold text-foreground">Truth Bench</span>
+              <div className="flex items-center gap-1">
+                <Link href="/" className="flex items-center gap-2 px-3 py-2 text-sm text-emerald-500 bg-emerald-500/10 rounded-md" data-testid="link-dashboard">
+                  <LayoutDashboard className="w-4 h-4" />
+                  Dashboard
+                </Link>
+                <Link href="/report" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors" data-testid="link-report">
+                  <FileText className="w-4 h-4" />
+                  Report
+                </Link>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="gap-2"
+                data-testid="button-play-pause"
+              >
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {isPlaying ? "Pause" : "Resume"}
+              </Button>
+              <ModeToggle />
+            </div>
+          </div>
+        </div>
+      </nav>
+
       <Ticker />
       
       <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
@@ -20,28 +54,12 @@ export default function Dashboard() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="space-y-1">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Truth Bench</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Live Simulation</h1>
                     <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 animate-pulse">
                         LIVE
                     </Badge>
                 </div>
                 <p className="text-muted-foreground">Prediction Market Simulator</p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-                <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="gap-2"
-                >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    {isPlaying ? "Pause Simulation" : "Resume"}
-                </Button>
-                <Button variant="outline" size="icon">
-                    <RefreshCw className="w-4 h-4" />
-                </Button>
-                <ModeToggle />
             </div>
         </header>
 
