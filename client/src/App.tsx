@@ -8,6 +8,7 @@ import Analyze from "@/pages/analyze";
 import Chat from "@/pages/chat";
 import TruthBench from "@/pages/truthbench";
 import Results from "@/pages/results";
+import Traces from "@/pages/traces";
 import NotFound from "@/pages/not-found";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/chat" component={Chat} />
       <Route path="/truthbench" component={TruthBench} />
       <Route path="/results" component={Results} />
+      <Route path="/traces" component={Traces} />
       <Route component={NotFound} />
     </Switch>
   );

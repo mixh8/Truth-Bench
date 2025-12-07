@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ModeToggle } from "@/components/mode-toggle";
+import { Nav } from "@/components/nav";
 import { Link } from "wouter";
 import { 
   FileText, 
@@ -812,30 +812,7 @@ export default function Analyze() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
-      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-6">
-              <span className="text-lg font-bold text-foreground">Truth Bench</span>
-              <div className="flex items-center gap-1">
-                <Link href="/" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors" data-testid="link-dashboard">
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Link>
-                <Link href="/report" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors" data-testid="link-report">
-                  <FileText className="w-4 h-4" />
-                  Report
-                </Link>
-                <Link href="/analyze" className="flex items-center gap-2 px-3 py-2 text-sm text-cyan-500 bg-cyan-500/10 rounded-md" data-testid="link-analyze">
-                  <Search className="w-4 h-4" />
-                  Analyze
-                </Link>
-              </div>
-            </div>
-            <ModeToggle />
-          </div>
-        </div>
-      </nav>
+      <Nav />
 
       <div className="flex-1 flex max-w-[1600px] mx-auto w-full">
         <aside className="w-[30%] border-r border-slate-800 p-4 overflow-y-auto">

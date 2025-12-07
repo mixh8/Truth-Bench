@@ -6,15 +6,18 @@ This module provides FastAPI endpoints for the TruthBench simulation:
 - POST /api/truthbench/stop - Stop a running simulation
 - GET /api/truthbench/results - Get final results
 - WS /api/truthbench/stream - Real-time WebSocket updates
+- GET /api/truthbench/traces - List all trace files
+- GET /api/truthbench/traces/{trace_id} - Get a specific trace
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query
 from pydantic import BaseModel, Field
 
 from .models import SimulationConfig, SimulationResult
@@ -351,4 +354,170 @@ async def stream_updates(websocket: WebSocket):
             })
         except Exception:
             pass
+
+
+# ==================== TRACE EXPLORATION ENDPOINTS ====================
+
+
+class TraceListItem(BaseModel):
+    """Summary of a trace file."""
+    trace_id: str
+    simulation_id: str
+    filename: str
+    start_time: str | None
+    end_time: str | None
+    status: str
+    models: list[str]
+    llm_calls_count: int
+    trades_count: int
+    settlements_count: int
+
+
+@router.get("/traces", response_model=list[TraceListItem])
+async def list_traces():
+    """List all available trace files, sorted by modification time (newest first)."""
+    traces_dir = Path(__file__).parent.parent.parent / "traces"
+    
+    if not traces_dir.exists():
+        return []
+    
+    # Sort by modification time (newest first)
+    trace_files = list(traces_dir.glob("truthbench_*.json"))
+    trace_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+    
+    traces = []
+    for trace_file in trace_files:
+        try:
+            with open(trace_file) as f:
+                data = json.load(f)
+            
+            traces.append(TraceListItem(
+                trace_id=trace_file.stem,
+                simulation_id=data.get("simulation_id", "unknown"),
+                filename=trace_file.name,
+                start_time=data.get("start_time"),
+                end_time=data.get("end_time"),
+                status=data.get("status", "unknown"),
+                models=data.get("config", {}).get("models", []),
+                llm_calls_count=len(data.get("llm_calls", [])),
+                trades_count=len(data.get("trade_executions", [])),
+                settlements_count=len(data.get("market_settlements", [])),
+            ))
+        except Exception as e:
+            logger.warning(f"Failed to parse trace file {trace_file}: {e}")
+            continue
+    
+    return traces
+
+
+@router.get("/traces/{trace_id}")
+async def get_trace(trace_id: str):
+    """Get a specific trace file by ID."""
+    traces_dir = Path(__file__).parent.parent.parent / "traces"
+    
+    # Find the trace file
+    trace_file = None
+    for f in traces_dir.glob(f"{trace_id}*.json"):
+        trace_file = f
+        break
+    
+    if trace_file is None or not trace_file.exists():
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+    
+    with open(trace_file) as f:
+        data = json.load(f)
+    
+    return data
+
+
+@router.get("/traces/{trace_id}/llm-calls")
+async def get_trace_llm_calls(
+    trace_id: str,
+    model_id: str | None = Query(None, description="Filter by model ID"),
+    market_ticker: str | None = Query(None, description="Filter by market ticker"),
+    limit: int = Query(50, description="Max results to return"),
+    offset: int = Query(0, description="Offset for pagination"),
+):
+    """Get LLM calls from a trace with optional filtering."""
+    traces_dir = Path(__file__).parent.parent.parent / "traces"
+    
+    trace_file = None
+    for f in traces_dir.glob(f"{trace_id}*.json"):
+        trace_file = f
+        break
+    
+    if trace_file is None or not trace_file.exists():
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+    
+    with open(trace_file) as f:
+        data = json.load(f)
+    
+    llm_calls = data.get("llm_calls", [])
+    
+    # Apply filters
+    if model_id:
+        llm_calls = [c for c in llm_calls if c.get("model_id") == model_id]
+    if market_ticker:
+        llm_calls = [c for c in llm_calls if c.get("market_ticker") == market_ticker]
+    
+    total = len(llm_calls)
+    llm_calls = llm_calls[offset:offset + limit]
+    
+    return {
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "llm_calls": llm_calls,
+    }
+
+
+@router.get("/traces/{trace_id}/trades")
+async def get_trace_trades(
+    trace_id: str,
+    model_id: str | None = Query(None, description="Filter by model ID"),
+    market_ticker: str | None = Query(None, description="Filter by market ticker"),
+):
+    """Get trade executions from a trace with optional filtering."""
+    traces_dir = Path(__file__).parent.parent.parent / "traces"
+    
+    trace_file = None
+    for f in traces_dir.glob(f"{trace_id}*.json"):
+        trace_file = f
+        break
+    
+    if trace_file is None or not trace_file.exists():
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+    
+    with open(trace_file) as f:
+        data = json.load(f)
+    
+    trades = data.get("trade_executions", [])
+    
+    if model_id:
+        trades = [t for t in trades if t.get("model_id") == model_id]
+    if market_ticker:
+        trades = [t for t in trades if t.get("market_ticker") == market_ticker]
+    
+    return {"trades": trades, "total": len(trades)}
+
+
+@router.get("/traces/{trace_id}/settlements")
+async def get_trace_settlements(trace_id: str):
+    """Get market settlements from a trace."""
+    traces_dir = Path(__file__).parent.parent.parent / "traces"
+    
+    trace_file = None
+    for f in traces_dir.glob(f"{trace_id}*.json"):
+        trace_file = f
+        break
+    
+    if trace_file is None or not trace_file.exists():
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+    
+    with open(trace_file) as f:
+        data = json.load(f)
+    
+    settlements = data.get("market_settlements", [])
+    
+    return {"settlements": settlements, "total": len(settlements)}
 

@@ -31,9 +31,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { ModeToggle } from '@/components/mode-toggle';
-import type { SimulationResults, ModelScore } from '@/lib/truthbenchApi';
-import { getSimulationResults, getSimulationStatus } from '@/lib/truthbenchApi';
+import { Nav } from '@/components/nav';
+import type { SimulationResults, ModelScore, TraceData, TraceListItem } from '@/lib/truthbenchApi';
+import { getSimulationResults, getSimulationStatus, getTraces, getTrace } from '@/lib/truthbenchApi';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { FileJson } from 'lucide-react';
 
 // Model colors for consistent visualization
 const MODEL_COLORS: Record<string, { gradient: string; bg: string; border: string }> = {
@@ -295,24 +303,73 @@ export default function Results() {
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [availableTraces, setAvailableTraces] = useState<TraceListItem[]>([]);
+  const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
 
+  // Fetch available traces on mount
+  useEffect(() => {
+    async function fetchTraces() {
+      try {
+        const traces = await getTraces();
+        const completedTraces = traces.filter(t => t.status === 'completed');
+        setAvailableTraces(completedTraces);
+        
+        // Auto-select the most recent trace
+        if (completedTraces.length > 0 && !selectedTraceId) {
+          setSelectedTraceId(completedTraces[0].trace_id);
+        }
+      } catch (e) {
+        console.error('Failed to fetch traces:', e);
+      }
+    }
+    fetchTraces();
+  }, []);
+
+  // Load results when selected trace changes
   useEffect(() => {
     async function fetchResults() {
+      if (!selectedTraceId) {
+        setResults(null);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const data = await getSimulationResults();
-        setResults(data);
-        setError(null);
+        
+        const traceData = await getTrace(selectedTraceId);
+        
+        // If trace has final_scores, use them
+        if (traceData.final_scores && traceData.final_scores.length > 0) {
+          setResults({
+            simulation_id: traceData.simulation_id,
+            status: traceData.status,
+            scores: traceData.final_scores,
+            rankings: traceData.final_rankings || [],
+            total_decisions: traceData.llm_calls?.length || 0,
+            markets_evaluated: traceData.market_settlements?.length || 0,
+            start_time: traceData.start_time,
+            end_time: traceData.end_time,
+          });
+          setError(null);
+        } else {
+          setResults(null);
+          setError('Selected trace has no results');
+        }
       } catch (e) {
         console.error('Failed to fetch results:', e);
         setError(e instanceof Error ? e.message : 'Failed to load results');
+        setResults(null);
       } finally {
         setLoading(false);
       }
     }
 
     fetchResults();
-  }, []);
+  }, [selectedTraceId]);
+
+  // Get info about the currently selected trace
+  const selectedTraceInfo = availableTraces.find(t => t.trace_id === selectedTraceId);
 
   const insights = results?.scores ? generateInsights(results.scores) : [];
   const sortedScores = results?.scores ? [...results.scores].sort((a, b) => b.roi - a.roi) : [];
@@ -335,52 +392,7 @@ export default function Results() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
-      {/* Navigation */}
-      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-6">
-              <span className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Brain className="w-5 h-5 text-emerald-500" />
-                TruthBench
-              </span>
-              <div className="flex items-center gap-1">
-                <Link
-                  href="/"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Link>
-                <Link
-                  href="/truthbench"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors"
-                >
-                  <Play className="w-4 h-4" />
-                  Simulation
-                </Link>
-                <Link
-                  href="/results"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-emerald-500 bg-emerald-500/10 rounded-md"
-                >
-                  <Trophy className="w-4 h-4" />
-                  Results
-                </Link>
-                <Link
-                  href="/analyze"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors"
-                >
-                  <Search className="w-4 h-4" />
-                  Analyze
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ModeToggle />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Nav />
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
@@ -419,16 +431,39 @@ export default function Results() {
                     </Badge>
                   </div>
                   <p className="text-muted-foreground">
-                    Simulation <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{results.simulation_id}</code>
-                    {' • '}{results.markets_evaluated} markets evaluated
+                    {results.markets_evaluated} markets evaluated
                     {' • '}{results.total_decisions} total decisions
                   </p>
                 </div>
 
-                <Button onClick={handleDownload} variant="outline" className="gap-2">
-                  <Download className="w-4 h-4" />
-                  Download Report
-                </Button>
+                <div className="flex items-center gap-3">
+                  {/* Simulation Selector */}
+                  {availableTraces.length > 0 && (
+                    <Select value={selectedTraceId || ''} onValueChange={setSelectedTraceId}>
+                      <SelectTrigger className="w-56 bg-background">
+                        <SelectValue placeholder="Select simulation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTraces.map(trace => (
+                          <SelectItem key={trace.trace_id} value={trace.trace_id}>
+                            <div className="flex items-center gap-2">
+                              <FileJson className="w-4 h-4 text-muted-foreground" />
+                              <span>{trace.simulation_id}</span>
+                              <Badge variant="outline" className="ml-1 text-xs">
+                                {trace.settlements_count} mkts
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <Button onClick={handleDownload} variant="outline" className="gap-2">
+                    <Download className="w-4 h-4" />
+                    Download Report
+                  </Button>
+                </div>
               </div>
 
               {/* Quick Stats */}

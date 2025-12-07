@@ -28,7 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ModeToggle } from '@/components/mode-toggle';
+import { Nav } from '@/components/nav';
 import { useTruthbench, useSortedPortfolios } from '@/hooks/useTruthbench';
 import type { Portfolio, TradingDecision, ModelScore } from '@/lib/truthbenchApi';
 
@@ -236,58 +236,7 @@ export default function TruthBench() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
-      {/* Navigation */}
-      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1800px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-6">
-              <span className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Brain className="w-5 h-5 text-emerald-500" />
-                TruthBench
-              </span>
-              <div className="flex items-center gap-1">
-                <Link
-                  href="/"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Link>
-                <Link
-                  href="/truthbench"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-emerald-500 bg-emerald-500/10 rounded-md"
-                >
-                  <Target className="w-4 h-4" />
-                  TruthBench
-                </Link>
-                <Link
-                  href="/results"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors"
-                >
-                  <Trophy className="w-4 h-4" />
-                  Results
-                </Link>
-                <Link
-                  href="/analyze"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 rounded-md hover:bg-slate-800 transition-colors"
-                >
-                  <Search className="w-4 h-4" />
-                  Analyze
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {isConnected && (
-                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                  <Activity className="w-3 h-3 mr-1" />
-                  Live
-                </Badge>
-              )}
-              <ModeToggle />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Nav />
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1800px] mx-auto w-full">

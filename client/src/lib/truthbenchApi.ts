@@ -194,6 +194,70 @@ export function createSimulationWebSocket(
   return ws;
 }
 
+// ============================================================================
+// Trace Types
+// ============================================================================
+
+export interface TraceListItem {
+  trace_id: string;
+  simulation_id: string;
+  filename: string;
+  start_time: string | null;
+  end_time: string | null;
+  status: string;
+  models: string[];
+  llm_calls_count: number;
+  trades_count: number;
+  settlements_count: number;
+}
+
+export interface TraceData {
+  simulation_id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  config: {
+    models: string[];
+    initial_bankroll: number;
+    max_markets: number;
+  };
+  final_scores?: ModelScore[];
+  final_rankings?: string[];
+  llm_calls: unknown[];
+  trade_executions: unknown[];
+  market_settlements: unknown[];
+}
+
+// ============================================================================
+// Trace API Functions
+// ============================================================================
+
+/**
+ * Get list of all available traces.
+ */
+export async function getTraces(): Promise<TraceListItem[]> {
+  const response = await fetch(`${LLM_SERVICE_URL}/api/truthbench/traces`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get traces: ${response.status}`);
+  }
+  
+  return response.json();
+}
+
+/**
+ * Get a specific trace by ID.
+ */
+export async function getTrace(traceId: string): Promise<TraceData> {
+  const response = await fetch(`${LLM_SERVICE_URL}/api/truthbench/traces/${traceId}`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get trace: ${response.status}`);
+  }
+  
+  return response.json();
+}
+
 /**
  * Convenience object for importing all API functions.
  */
@@ -203,5 +267,7 @@ export const truthbenchApi = {
   stopSimulation,
   getSimulationResults,
   createSimulationWebSocket,
+  getTraces,
+  getTrace,
 } as const;
 
